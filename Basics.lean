@@ -274,4 +274,8 @@ namespace NatPlayground
   example : (ltb 2 4) = MySpace.Bool.true := by sorry
   example : (ltb 4 2) = MySpace.Bool.false := by sorry
 
+
 end NatPlayground
+
+
+
