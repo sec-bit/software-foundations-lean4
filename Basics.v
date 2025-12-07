@@ -24,7 +24,6 @@ Compute (next_working_day (next_working_day saturday)).
 
 Example test_next_working_day:
   (next_working_day (next_working_day saturday)) = tuesday.
-
 Proof. simpl. reflexivity.  Qed.
 
 From Stdlib Require Export String.
@@ -256,6 +255,9 @@ Fixpoint even( n : nat ) : bool :=
   | S O => false 
   | S ( S n') => even n'
   end.
+
+
+
 
 Definition odd ( n : nat ) : bool :=
   negb ( even n).
