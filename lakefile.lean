@@ -11,3 +11,7 @@ lean_lib «Basics» where
 @[default_target]
 lean_lib «Induction» where
   srcDir := "."
+
+@[default_target]
+lean_lib «Lists» where
+  srcDir := "."
