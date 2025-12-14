@@ -146,6 +146,30 @@ Proof.
   }
 Qed.
 
+Lemma mul_succ_r : forall n m : nat,
+  n * (S m) = n + n * m.
+Proof.
+  intros n m.
+  induction n as [| n' IHn'].
+  - simpl. reflexivity.
+  - simpl.
+    rewrite IHn'.
+    rewrite add_assoc.
+    rewrite add_assoc.
+    rewrite (add_comm m n').
+    reflexivity.
+Qed.
+
+Theorem mul_comm : forall m n : nat,
+  m*n = n*m.
+Proof.
+  intros n m.
+  induction n as [ | n' IHn'].
+  - simpl. rewrite mult_0_r. reflexivity.
+  - simpl. rewrite mul_succ_r. rewrite IHn'. reflexivity.
+Qed.
+
+
 Theorem leb_refl : forall n : nat,
   ( n <=? n) = true.
 Proof.
