@@ -1,3 +1,4 @@
+import Basics
 -- α is an implicit type parameter.
 -- x has type α.
 -- The result is a List containing elements of type α.
@@ -64,8 +65,6 @@ example : hd_error (α := Nat) [] = none := by
 
 def doit3times {α : Type} (f : α -> α) (n : α) : α :=
   f (f (f n))
-
-def minustwo (n : Nat) : Nat := n - 2
 
 example : doit3times minustwo 9 = 3 := rfl
 
