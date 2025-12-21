@@ -415,7 +415,7 @@ theorem combine_split : ∀ X Y (l : List (X × Y)) l1 l2,
     intro l1 l2 h
     dsimp [split'] at h
     cases h
-    simp [combine']
+    dsimp [combine']
   | cons p l' ih =>
   intro l1 l2 h
   cases p with
