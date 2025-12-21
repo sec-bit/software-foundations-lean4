@@ -1,6 +1,4 @@
 -- Basics: Functional Programming in Coq
---
--- https://softwarefoundations.cis.upenn.edu/lf-current/Basics.html
 
 -- # Data and Functions
 
@@ -114,27 +112,31 @@ def invert (x: BW) : BW :=
 -- ### Exercise: 1 star, standard (nandb)
 -- TODO: Replace `sorry` with your definitions.
 def nandb (b1 b2 : MyBool) : MyBool :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match b1, b2 with
+  | .true, .true => .false
+  | _, _ => .true
 example : (nandb .true .false) = true :=
-  /- FILL IN HERE -/ sorry
+  rfl
 example : (nandb .false .false) = true :=
-  /- FILL IN HERE -/ sorry
+  rfl
 example : (nandb .false .true) = true :=
-  /- FILL IN HERE -/ sorry
+  rfl
 example : (nandb .true .true) = false :=
-  /- FILL IN HERE -/ sorry
+  rfl
 
 -- ### Exercise: 1 star, standard (andb3)
 def andb3 (b1 b2 b3 : MyBool) : MyBool :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match b1, b2, b3 with
+  | .true, .true, .true => .true
+  | _, _, _ => .false
 example : andb3 .true .true .true = .true :=
-  /- FILL IN HERE -/ sorry
+  rfl
 example : andb3 .false .true .true = .false :=
-  /- FILL IN HERE -/ sorry
+  rfl
 example : andb3 .true .false .true = .false :=
-  /- FILL IN HERE -/ sorry
+  rfl
 example : andb3 .true .true .false = .false :=
-  /- FILL IN HERE -/ sorry
+  rfl
 
 -- NOTE: We'll use lean's built-in `Bool` instead of `MyBool`
 -- for the rest of the file.
@@ -273,12 +275,15 @@ def exp (base power : Nat) : Nat :=
   | .succ p => Nat.mul base (exp base p)
 
 -- ### Exercise: 1 star, standard (factorial)
+
 def factorial (n : Nat) : Nat :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match n with
+  | .zero => .succ .zero
+  | .succ p => Nat.mul n (factorial p)
 example : factorial 3 = 6 :=
-  /- FILL IN HERE -/ sorry
+  rfl
 example : factorial 5 = Nat.mul 10 12 :=
-  /- FILL IN HERE -/ sorry
+  rfl
 
 infixl:65 " my+ " => Nat.add
 infixl:65 " my- " => Nat.sub
@@ -316,16 +321,16 @@ example : (4 <=? 2) = false := rfl
 
 -- ### Exercise: 1 star, standard (ltb)
 def ltb (n m : Nat) : Bool :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  leb (.succ n) m
 
 infix:50 " <? " => ltb
 
 example : ltb 2 2 = false :=
-  /- FILL IN HERE -/ sorry
+  rfl
 example : ltb 2 4 = true :=
-  /- FILL IN HERE -/ sorry
+  rfl
 example : ltb 4 2 = false :=
-  /- FILL IN HERE -/ sorry
+  rfl
 
 -- # Proof by Simplification
 theorem zero_add : ∀ n : Nat, 0 + n = n := by
@@ -356,7 +361,10 @@ theorem plus_id_example : ∀ n m : Nat, n = m → n + n = m + m := by
 
 -- ### Exercise: 1 star, standard (plus_id_exercise)
 theorem plus_id_exercise : ∀ n m o : Nat, n = m → m = o → n + m = m + o := by
-  /- FILL IN HERE -/ sorry
+  intro n m o H1 H2
+  rewrite [H1]
+  rewrite [<- H2]
+  rfl
 
 #check Nat.mul_zero -- Nat.mul_zero (n : Nat) : n * 0 = 0
 #check Nat.mul_succ -- Nat.mul_succ (n m : Nat) : n * m.succ = n * m + n
@@ -369,13 +377,16 @@ theorem mul_zero_add_mul_zero_eq_zero : ∀ p q : Nat, (p * 0) + (q * 0) = 0 := 
 
 -- ### Exercise: 1 star, standard (mult_n_1)
 theorem mul_one : ∀ p : Nat, p * 1 = p := by
-  /- FILL IN HERE -/ sorry
+  intro p
+  rw [Nat.mul_succ]
+  rw [Nat.mul_zero]
+  simp
 
 -- # Proof by Case Analysis
-theorem add_one_neq_zero_firsttry : ∀ n : Nat, (n + 1 =? 0) = false := by
-  intro n
-  -- simp: does nothing!
-  sorry
+-- theorem add_one_neq_zero_firsttry : ∀ n : Nat, (n + 1 =? 0) = false := by
+--   intro n
+--   -- simp: does nothing!
+--   sorry
 
 theorem add_one_neq_zero : ∀ n : Nat, (n + 1 =? 0) = false := by
   intro n
@@ -437,11 +448,19 @@ theorem and3_exchange' : ∀ b c d : Bool, and (and b c) d = and (and b d) c := 
 
 -- ### Exercise: 2 stars, standard (andb_true_elim2)
 theorem and_true_elim2 : ∀ b c : Bool, and b c = true → c = true := by
-  /- FILL IN HERE -/ sorry
+  intro b c H
+  cases b
+  . simp at H
+  . simp at H
+    rewrite [<- H]
+    rfl
 
 -- ### Exercise: 1 star, standard (zero_nbeq_plus_1)
 theorem zero_nbeq_add_one : ∀ n : Nat, (0 =? n + 1) = false := by
-  /- FILL IN HERE -/ sorry
+  intro n
+  cases n
+  . rfl
+  . rfl
 
 -- ## More on Notation (Optional)
 -- NOTE: We'll skip `Exercise: 2 stars, standard, optional (decreasing)`,
@@ -456,17 +475,36 @@ theorem identity_fn_applied_twice :
   ∀ (f : Bool → Bool),
   (∀ (x : Bool), f x = x) →
   ∀ (b : Bool), f (f b) = b := by
-  /- FILL IN HERE -/ sorry
+  intro f h b
+  rw [h, h]
+
+def negb_bool (b : Bool) : Bool :=
+  match b with
+  | .true => .false
+  | .false => .true
 
 -- ### Exercise: 1 star, standard (negation_fn_applied_twice)
-/- FILL IN HERE -/
+theorem negation_fn_applied_twice :
+  ∀ (f: Bool -> Bool),
+  (∀ (x: Bool), f x = negb_bool x ) ->
+  ∀ (b : Bool), f ( f b ) = b := by
+  intro f h b
+  rw [h, h]
+  cases b
+  . rfl
+  . rfl
 
 -- ### Exercise: 3 stars, standard, optional (and_eq_or)
 theorem and_eq_or :
   ∀ (b c : Bool),
   (and b c = or b c) →
   b = c := by
-  /- FILL IN HERE -/ sorry
+  intro b c h
+  cases b <;> cases c
+  . rfl
+  . simp at h
+  . simp at h
+  . rfl
 
 -- ## Course Late Policies, Formalized
 namespace LateDays
@@ -507,7 +545,8 @@ namespace LateDays
   -- ### Exercise: 1 star, standard (letter_comparison)
   def letter_comparison_eq :
     ∀ l, letter_comparison l l = .eq := by
-    /- FILL IN HERE -/ sorry
+    intro l
+    cases l <;> rfl
 
   def modifier_comparison (m1 m2 : Modifier) : Comparison :=
     match m1, m2 with
@@ -521,19 +560,23 @@ namespace LateDays
 
   -- ### Exercise: 2 stars, standard (grade_comparison)
   def grade_comparison (g1 g2 : Grade) : Comparison :=
-    /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+    match g1, g2 with
+    | .grade l1 m1 , .grade l2 m2 =>
+      match letter_comparison l1 l2 with
+      | .eq => modifier_comparison m1 m2
+      | other => other
 
   example : grade_comparison (.grade .a .minus) (.grade .b .plus) = .gt :=
-    /- FILL IN HERE -/ sorry
+    rfl
 
   example : grade_comparison (.grade .a .minus) (.grade .a .plus) = .lt :=
-    /- FILL IN HERE -/ sorry
+    rfl
 
   example : grade_comparison (.grade .f .plus) (.grade .f .plus) = .eq :=
-    /- FILL IN HERE -/ sorry
+    rfl
 
   example : grade_comparison (.grade .b .minus) (.grade .c .plus) = .gt :=
-    /- FILL IN HERE -/ sorry
+    rfl
 
   def lower_letter (l : Letter) : Letter :=
     match l with
@@ -543,15 +586,15 @@ namespace LateDays
     | .d => .f
     | .f => .f -- Can't go lower than F!
 
-  theorem lower_letter_lowers_wrong :
-    ∀ (l : Letter), letter_comparison (lower_letter l) l = .lt := by
-    intro l
-    cases l
-    . rfl -- a -> b
-    . rfl -- b -> c
-    . rfl -- c -> d
-    . rfl -- d -> f
-    . sorry -- We get stuck here
+  -- theorem lower_letter_lowers_wrong :
+  --   ∀ (l : Letter), letter_comparison (lower_letter l) l = .lt := by
+  --   intro l
+  --   cases l
+  --   . rfl -- a -> b
+  --   . rfl -- b -> c
+  --   . rfl -- c -> d
+  --   . rfl -- d -> f
+  --   . sorry -- We get stuck here
 
   theorem lower_letter_f_is_f : lower_letter .f = .f := by
     rfl
@@ -561,42 +604,67 @@ namespace LateDays
     ∀ (l : Letter),
     letter_comparison .f l = .lt →
     letter_comparison (lower_letter l) l = .lt := by
-    /- FILL IN HERE -/ sorry
+    intro l h
+    cases l
+    . rfl
+    . rfl
+    . rfl
+    . rfl
+    . simp [letter_comparison] at h
 
   -- ### Exercise: 2 stars, standard (lower_grade)
   def lower_grade (g : Grade) : Grade :=
-    /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+    match g with
+    | .grade l m =>
+      match m with
+      | .plus => .grade l .natural
+      | .natural => .grade l .minus
+      | .minus =>
+        match l with
+        | .f => .grade .f .minus
+        | _ => .grade (lower_letter l) .plus
 
   example : lower_grade (.grade .a .plus) = (.grade .a .natural) :=
-    /- FILL IN HERE -/ sorry
+    rfl
 
   example : lower_grade (.grade .a .natural) = (.grade .a .minus) :=
-    /- FILL IN HERE -/ sorry
+    rfl
 
   example : lower_grade (.grade .a .minus) = (.grade .b .plus) :=
-    /- FILL IN HERE -/ sorry
+    rfl
 
   example : lower_grade (.grade .b .plus) = (.grade .b .natural) :=
-    /- FILL IN HERE -/ sorry
+    rfl
 
   example : lower_grade (.grade .f .natural) = (.grade .f .minus) :=
-    /- FILL IN HERE -/ sorry
+    rfl
 
   example : lower_grade (lower_grade (.grade .b .minus)) = (.grade .c .natural) :=
-    /- FILL IN HERE -/ sorry
+    rfl
 
   example : lower_grade (lower_grade (lower_grade (.grade .b .minus))) = (.grade .c .minus) :=
-    /- FILL IN HERE -/ sorry
+    rfl
 
   theorem lower_grade_f_minus : lower_grade (.grade .f .minus) = (.grade .f .minus) := by
-    /- FILL IN HERE -/ sorry
+    rfl
 
   -- ### Exercise: 3 stars, standard (lower_grade_lowers)
-  theorem lower_grade_lowers :
+theorem lower_grade_lowers :
     ∀ (g : Grade),
     grade_comparison (.grade .f .minus) g = .lt →
     grade_comparison (lower_grade g) g = .lt := by
-    /- FILL IN HERE -/ sorry
+    intro g h
+    cases g with | grade l m =>
+    cases m
+    · simp [lower_grade, grade_comparison, modifier_comparison, letter_comparison_eq]
+    · simp [lower_grade, grade_comparison, modifier_comparison, letter_comparison_eq]
+    · cases l
+      · rfl
+      · rfl
+      · rfl
+      · rfl
+      · unfold grade_comparison letter_comparison modifier_comparison at h
+        contradiction
 
   def apply_late_policy (late_days : Nat) (g : Grade) : Grade :=
     if late_days <? 9 then g
@@ -621,7 +689,10 @@ namespace LateDays
     (late_days <? 9) = true →
     apply_late_policy late_days g = g
   := by
-    /- FILL IN HERE -/ sorry
+    intro late_days g h
+    unfold apply_late_policy
+    rw [h]
+    simp
 
   -- ### Exercise: 2 stars, standard (graded_lowered_once)
   theorem grade_lowered_once :
@@ -630,7 +701,12 @@ namespace LateDays
       (late_days <? 17) = true →
       apply_late_policy late_days g = lower_grade g
   := by
-    /- FILL IN HERE -/ sorry
+    intro late_days g h1 h2
+    unfold apply_late_policy
+    rw [h1]
+    simp
+    rw [h2]
+    simp
 end LateDays
 
 -- ## Binary Numerals
@@ -642,25 +718,31 @@ inductive Bin : Type where
   | b1 (n : Bin)
 
 def incr (m : Bin) : Bin :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match m with
+  | .z => .b1 .z
+  | .b0 n => .b1 n
+  | .b1 n => .b0 (incr n)
 
 def bin_to_nat (m : Bin) : Nat :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match m with
+  | .z => 0
+  | .b0 n => 2*bin_to_nat n
+  | .b1 n => 1 + 2*bin_to_nat n
 
 example : (incr (.b1 .z)) = .b0 (.b1 .z) :=
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : (incr (.b0 (.b1 .z))) = .b1 (.b1 .z) :=
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : (incr (.b1 (.b1 .z))) = .b0 (.b0 (.b1 .z)) :=
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : bin_to_nat (.b0 (.b1 .z)) = 2 :=
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : bin_to_nat (incr (.b1 .z)) = 1 + bin_to_nat (.b1 .z) :=
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : bin_to_nat (incr (incr (.b1 .z))) = 2 + bin_to_nat (.b1 .z) :=
-  /- FILL IN HERE -/ sorry
+  rfl
