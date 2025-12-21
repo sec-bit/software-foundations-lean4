@@ -187,3 +187,14 @@ theorem Perm3_refl : forall (X : Type ) (a b c : X),
     . apply Perm3.perm3_swap12
     . apply Perm3.perm3_swap12
 
+-- USING EVIDENCE IN PROOFS
+
+open Nat
+
+theorem ev_inversion : forall (n : Nat),
+  ev n -> ((n=0)∨ (exists n', n = n'.succ.succ ∧ ev n')) := by
+  intro n E
+  cases E with
+  | ev_0 => simp
+  | ev_SS n' E' => right
+                   exists n'
