@@ -1,6 +1,4 @@
 -- Lists: Working with Structured Data
---
--- https://softwarefoundations.cis.upenn.edu/lf-current/Lists.html
 
 import Induction
 
@@ -35,9 +33,9 @@ theorem surjective_pairing' : ∀ n m : Nat, (n,m) = (fst (n,m), snd (n,m)) := b
   intro n m
   rfl
 
-theorem surjective_pairing_stuck : ∀ p : NatProd, p = (fst p, snd p) := by
-  -- simp: doesn't reduce anything!
-  sorry
+-- theorem surjective_pairing_stuck : ∀ p : NatProd, p = (fst p, snd p) := by
+--   -- simp: doesn't reduce anything!
+--   sorry
 
 theorem surjective_pairing : ∀ p : NatProd, p = (fst p, snd p) := by
   intro p
@@ -46,11 +44,16 @@ theorem surjective_pairing : ∀ p : NatProd, p = (fst p, snd p) := by
 
 -- ### Exercise: 1 star, standard (snd_fst_is_swap)
 theorem snd_fst_is_swap : ∀ p : NatProd, (snd p, fst p) = swap_pair p := by
-  /- FILL IN HERE -/ sorry
+  intro p
+  cases p
+  rfl
+
 
 -- ### Exercise: 1 star, standard, optional (fst_swap_is_snd)
 theorem fst_swap_is_snd : ∀ p : NatProd, fst (swap_pair p) = snd p := by
-  /- FILL IN HERE -/ sorry
+  intro p
+  cases p
+  rfl
 
 -- # Lists of Numbers
 inductive NatList where
@@ -109,127 +112,163 @@ example : tl [1, 2, 3] = [2, 3] := rfl
 
 -- ### Exercise: 2 stars, standard, especially useful (list_funs)
 def nonzeros (l : NatList) : NatList :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match l with
+  | [] => []
+  | h :: t =>
+    if h == 0 then nonzeros t
+    else h :: nonzeros t
 
 example : nonzeros [0, 1, 0, 2, 3, 0, 0] = [1, 2, 3] := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 def oddmembers (l : NatList) : NatList :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match l with
+  | [] => []
+  | h :: t =>
+    if h%2 == 1 then h :: oddmembers t
+    else oddmembers t
 
 example : oddmembers [0, 1, 0, 2, 3, 0, 0] = [1, 3] := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 def countoddmembers (l : NatList) : Nat :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match l with
+  | [] => 0
+  | h :: t =>
+    if h%2 == 1 then 1 + countoddmembers t
+    else countoddmembers t
 
 example : countoddmembers [1, 0, 3, 1, 4, 5] = 4 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : countoddmembers [0, 2, 4] = 0 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : countoddmembers [] = 0 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 -- ### Exercise: 3 stars, advanced (alternate)
 def alternate (l1 l2 : NatList) : NatList :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match l1, l2 with
+  | [], l2 => l2
+  | l1, [] => l1
+  | h1 :: t1, h2 :: t2 => h1 :: h2 :: alternate t1 t2
 
 example : alternate [1, 2, 3] [4, 5, 6] = [1, 4, 2, 5, 3, 6] := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : alternate [1] [4, 5, 6] = [1, 4, 5, 6] := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : alternate [1, 2, 3] [4] = [1, 4, 2, 3] := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : alternate [] [20, 30] = [20, 30] := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 -- ## Bags via Lists
 def Bag := NatList
 
 -- ### Exercise: 3 stars, standard, especially useful (bag_functions)
 def count (v : Nat) (s : Bag) : Nat :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match s with
+  | [] => 0
+  | h :: t =>
+    if h == v then 1 + count v t
+    else count v t
 
 example : count 1 [1, 2, 3, 1, 4, 1] = 3 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : count 6 [1, 2, 3, 1, 4, 1] = 0 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
-def sum: Bag → Bag → Bag :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+def sum ( s1 s2 : Bag) : Bag :=
+  s1 ++ s2
 
 example : count 1 (sum [1, 2, 3] [1, 4, 1]) = 3 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 def add (v : Nat) (s : Bag) : Bag :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  v :: s
 
 example : count 1 (add 1 [1, 4, 1]) = 3 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : count 5 (add 1 [1, 4, 1]) = 0 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 def member (v : Nat) (s : Bag) : Bool :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match s with
+  | [] => false
+  | h :: t =>
+    if h == v then true
+    else member v t
 
 example : member 1 [1, 4, 1] = true := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : member 2 [1, 4, 1] = false := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 -- ### Exercise: 3 stars, standard, optional (bag_more_functions)
 def remove_one (v : Nat) (s : Bag) : Bag :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match s with
+  | [] => []
+  | h :: t => if h == v then t else h :: remove_one v t
 
 example : count 5 (remove_one 5 [2, 1, 5, 4, 1]) = 0 := by
-  /- FILL IN HERE -/ sorry
+ rfl
 
 example : count 5 (remove_one 5 [2, 1, 4, 1]) = 0 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : count 4 (remove_one 5 [2, 1, 4, 5, 1, 4]) = 2 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : count 5 (remove_one 5 [2, 1, 5, 4, 5, 1, 4]) = 1 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 def remove_all (v : Nat) (s : Bag) : Bag :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match s with
+  | [] => []
+  | h :: t =>
+    if h == v then remove_all v t
+    else h :: remove_all v t
 
 example : count 5 (remove_all 5 [2, 1, 5, 4, 1]) = 0 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : count 5 (remove_all 5 [2, 1, 4, 1]) = 0 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : count 4 (remove_all 5 [2, 1, 4, 5, 1, 4]) = 2 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : count 5 (remove_all 5 [2, 1, 5, 4, 5, 1, 4, 5, 1, 4]) = 0 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 def included (s1 : Bag) (s2 : Bag) : Bool :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match s1 with
+  | [] => true
+  | h :: t =>
+    if member h s2 then included t (remove_one h s2)
+    else false
 
 example : included [1, 2] [2, 1, 4, 1] = true := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : included [1, 2, 2] [2, 1, 4, 1] = false := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 -- ### Exercise: 2 stars, standard, especially useful (add_inc_count)
 -- NOTE: Adding a value to a bag should increase the value's count by one.
 -- State this as a theorem and prove it in Lean.
 
--- theorem add_inc_count : ...
+theorem add_inc_count : ∀ v : Nat, forall s : Bag, count v ( add v s) = Nat.succ (count v s) := by
+  intro v s
+  simp [add, count]
+  simp [Nat.add_comm]
 
 -- # Reasoning About Lists
 theorem nil_app : ∀ l : NatList, [] ++ l = l := by
@@ -248,14 +287,14 @@ theorem app_assoc : ∀ l1 l2 l3 : NatList, (l1 ++ l2) ++ l3 = l1 ++ (l2 ++ l3) 
   | nil => rfl
   | cons h t ih => simp [app] <;> rewrite [ih] <;> rfl
 
-theorem repeat_double_firsttry : ∀ c n : Nat, repeatN n c ++ repeatN n c = repeatN n (c + c) := by
-  intros c
-  induction c with
-  | zero => intro n <;> rfl
-  | succ c' ih =>
-    intro n
-    -- simp: seems to do nothing!
-    sorry
+-- theorem repeat_double_firsttry : ∀ c n : Nat, repeatN n c ++ repeatN n c = repeatN n (c + c) := by
+--   intros c
+--   induction c with
+--   | zero => intro n <;> rfl
+--   | succ c' ih =>
+--     intro n
+--     -- simp: seems to do nothing!
+--     sorry
 
 theorem repeat_plus : ∀ c1 c2 n : Nat, repeatN n c1 ++ repeatN n c2 = repeatN n (c1 + c2) := by
   intros c1 c2 n
@@ -274,22 +313,22 @@ def rev (l : NatList) : NatList :=
 example : rev [1, 2, 3] = [3, 2, 1] := rfl
 example : rev [] = [] := rfl
 
-theorem rev_length_firsttry : ∀ l : NatList, length (rev l) = length l := by
-  intro l
-  induction l with
-  | nil => rfl
-  | cons h t ih =>
-    -- simp: seems to do nothing!
-    sorry
+-- theorem rev_length_firsttry : ∀ l : NatList, length (rev l) = length l := by
+--   intro l
+--   induction l with
+--   | nil => rfl
+--   | cons h t ih =>
+--     -- simp: seems to do nothing!
+--     sorry
 
-theorem app_rev_length_succ_firsttry : ∀ l n, length (rev l ++ [n]) = Nat.succ (length l) := by
-  intro l
-  induction l with
-  | nil => intro n <;> rfl
-  | cons h t ih =>
-    intro n
-    -- simp: seems to do nothing!
-    sorry
+-- theorem app_rev_length_succ_firsttry : ∀ l n, length (rev l ++ [n]) = Nat.succ (length l) := by
+--   intro l
+--   induction l with
+--   | nil => intro n <;> rfl
+--   | cons h t ih =>
+--     intro n
+--     -- simp: seems to do nothing!
+--     sorry
 
 theorem app_length_succ : ∀ l n, length (l ++ [n]) = Nat.succ (length l) := by
   intro l
@@ -320,46 +359,75 @@ theorem app_length : ∀ l1 l2 : NatList, length (l1 ++ l2) = length l1 + length
 -- ## List Exercises, Part 1
 -- ### Exercise: 3 stars, standard (list_exercises)
 theorem app_nil_r : ∀ l : NatList, l ++ [] = l := by
-  /- FILL IN HERE -/ sorry
+  intro l
+  induction l with
+  | nil => rfl
+  | cons h t ih =>
+      simp [NatList.app, ih]
+
 
 theorem rev_app_distr : ∀ l1 l2 : NatList, rev (l1 ++ l2) = rev l2 ++ rev l1 := by
-  /- FILL IN HERE -/ sorry
+  intro l1 l2
+  induction l1 with
+  | nil => simp[rev]
+           rw[NatList.app]
+           rw[app_nil_r]
+  | cons h t ih => simp[rev, NatList.app]
+                   rw[ih]
+                   rw[app_assoc]
 
 theorem rev_involutive : ∀ l : NatList, rev (rev l) = l := by
-  /- FILL IN HERE -/ sorry
+  intro l
+  induction l with
+  | nil => rfl
+  | cons h t ih =>
+    simp [rev]
+    rw[ rev_app_distr]
+    rw[ih]
+    rfl
 
 theorem app_assoc4:
   ∀ l1 l2 l3 l4 : NatList,
   l1 ++ (l2 ++ (l3 ++ l4)) = ((l1 ++ l2) ++ l3) ++ l4
 := by
-  /- FILL IN HERE -/ sorry
+  intro l1 l2 l3 l4
+  rw[app_assoc]
+  rw[app_assoc]
 
 theorem nonzeros_app :
   ∀ l1 l2 : NatList,
   nonzeros (l1 ++ l2) = (nonzeros l1) ++ (nonzeros l2)
 := by
-  /- FILL IN HERE -/ sorry
+  intro l1 l2
+  induction l1 with
+  | nil => rfl
+  | cons h t ih => simp[NatList.app, nonzeros]
+                   match h with
+                   | 0 => simp
+                          apply ih
+                   | (n+1) => simp [NatList.app]
+                              rw[ih]
 
 -- ### Exercise: 2 stars, standard (eqblist)
 def eqblist (l1 l2 : NatList) : Bool :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match l1, l2 with
+  | [], [] => true
+  | [], _ => false
+  | _, [] => false
+  | h1 :: t1, h2 :: t2 => (h1 == h2) && eqblist t1 t2
 
-example : eqblist [] [] = true := by
-  /- FILL IN HERE -/ sorry
+example : eqblist [] [] = true := by rfl
+example : eqblist [1, 2, 3] [1, 2, 3] = true := by rfl
+example : eqblist [1, 2, 3] [1, 2, 4] = false := by rfl
 
-example : eqblist [1, 2, 3] [1, 2, 3] = true := by
-  /- FILL IN HERE -/ sorry
-
-example : eqblist [1, 2, 3] [1, 2, 4] = false := by
-  /- FILL IN HERE -/ sorry
-
-theorem eqblist_refl : ∀ l : NatList, true = eqblist l l := by
-  /- FILL IN HERE -/ sorry
 
 -- ## List Exercises, Part 2
 -- ### Exercise: 1 star, standard (count_member_nonzero)
 theorem count_member_nonzero : ∀ (s : Bag), (1 <=? (count 1 (1 :: s))) = true := by
-  /- FILL IN HERE -/ sorry
+  intro s
+  simp [count]
+  rw[Nat.add_comm]
+  simp [leb]
 
 theorem leb_n_succ : ∀ n, (n <=? Nat.succ n) = true := by
   intro n
@@ -371,21 +439,26 @@ theorem leb_n_succ : ∀ n, (n <=? Nat.succ n) = true := by
 theorem remove_does_not_increase_count :
   ∀ (s : Bag),
   ((count 0 (remove_one 0 s)) <=? (count 0 s)) = true := by
-  /- FILL IN HERE -/ sorry
+  sorry
 
--- ### Exercise: 3 stars, standard, optional (bag_count_sum)
--- theorem bag_count_sum : ...
 
 -- ### Exercise: 3 stars, advanced (involution_injective)
 theorem involution_injective :
   ∀ (f : Nat → Nat),
   (∀ n : Nat, n = f (f n)) → (∀ n1 n2 : Nat, f n1 = f n2 → n1 = n2)
 := by
-  /- FILL IN HERE -/ sorry
+  intro f H n1 n2 Heq
+  rewrite [H n1]
+  rewrite [H n2]
+  rewrite [Heq]
+  rfl
 
 -- ### Exercise: 2 stars, advanced (rev_injective)
 theorem rev_injective : ∀ (l1 l2 : NatList), rev l1 = rev l2 → l1 = l2 := by
-  /- FILL IN HERE -/ sorry
+  intro l1 l2 H
+  have H2 : rev ( rev l1 ) = rev ( rev l2) := by rw[H]
+  repeat rw[rev_involutive] at H2
+  exact H2
 
 -- # Options
 def nth_bad (l: NatList) (n: Nat) : Nat :=
@@ -419,23 +492,34 @@ def option_elim (d: Nat) (o: NatOption) : Nat :=
 
 -- ### Exercise: 2 stars, standard (hd_error)
 def hd_error (l : NatList) : NatOption :=
-  /- REPLACE THIS LINE WITH YOUR DEFINITION -/ sorry
+  match l with
+  | [] => .None
+  | h :: _ => .Some h
 
 example : hd_error [] = .None := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : hd_error [1] = .Some 1 := by
-  /- FILL IN HERE -/ sorry
+  rfl
 
 example : hd_error [5, 6] = .Some 5 := by
-  /- FILL IN HERE -/ sorry
+  rfl
+
+theorem eqb_refl : forall n: Nat, (n==n)=true := by
+  intro n
+  induction n with
+  | zero => simp
+  | succ n' ih => simp
 
 -- ### Exercise: 1 star, standard, optional (option_elim_hd)
 theorem option_elim_hd :
   ∀ (l: NatList) (default: Nat),
   hd default l = option_elim default (hd_error l)
 := by
-  /- FILL IN HERE -/ sorry
+  intro l default
+  cases l
+  . rfl
+  . rfl
 
 end NatList
 
@@ -450,7 +534,9 @@ def eqb_id (x1 x2 : MyId) :=
 
 -- ### Exercise: 1 star, standard (eqb_id_refl)
 theorem eqb_id_refl : ∀ x, eqb_id x x = true := by
-  /- FILL IN HERE -/ sorry
+  intro x
+  simp[eqb_id]
+  rw[eqb_refl]
 
 namespace PartialMap
 export NatList (NatOption)
@@ -473,13 +559,18 @@ theorem update_eq :
   ∀ (d : partial_map) (x : MyId) (v : Nat),
   find x (update d x v) = .Some v
 := by
-  /- FILL IN HERE -/ sorry
+  intro d x v
+  simp [update, find]
+  rw [eqb_id_refl]
+  simp
 
 -- ### Exercise: 1 star, standard (update_neq)
 theorem update_neq :
   ∀ (d : partial_map) (x y : MyId) (o : Nat),
   eqb_id x y = false → find x (update d y o) = find x d
 := by
-  /- FILL IN HERE -/ sorry
-
+  intro d x y o hneq
+  simp [update, find]
+  rw[hneq]
+  simp
 end PartialMap
