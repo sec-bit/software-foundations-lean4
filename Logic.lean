@@ -1,4 +1,5 @@
 -- Logic.lean
+import Tactics
 
 #check (∀ n m : Nat, n + m = m + n )
 #check (2=2 : Prop)
@@ -23,7 +24,7 @@ theorem succ_inj : injective Nat.succ := by
   intro x y H
   injection H
 
-#check @Eq 
+#check @Eq
 
 /-
   LOGICAL CONNECTIVES
@@ -44,14 +45,17 @@ example : 3 + 4 = 7 ∧ 2 * 2 = 4 := by
 #check And.intro -- : ∀ {a b : Prop}, a → b → a ∧ b
 
 -- Alternative: using `And.intro` directly (like Coq's `apply conj`)
-example : 3 + 4 = 7 ∧ 2 * 2 = 4 := by
-  apply And.intro
-  · rfl
-  · rfl
+example : 3 + 4 = 7 ∧ 2*2=4 := by
+  constructor
+  .rfl
+  .rfl
 
--- Another alternative: anonymous constructor syntax
-example : 3 + 4 = 7 ∧ 2 * 2 = 4 :=
-  ⟨by rfl, by rfl⟩
+#check And.intro
+
+example : 3 + 4 = 7 ∧ 2*2=4 := by
+  apply And.intro
+  .rfl
+  .rfl
 
 example (n m : Nat) : n + m = 0 → n = 0 ∧ m = 0 := by
   intro h
@@ -59,18 +63,27 @@ example (n m : Nat) : n + m = 0 → n = 0 ∧ m = 0 := by
   | zero =>
     constructor
     · rfl
-    · exact h
+    · simp at h
+      exact h
   | succ n' =>
-    -- n' + 1 + m = 0 is impossible
-    contradiction
+    -- n' + 1 + m = 0 is impossible ( simp at h fails to simplify; revealing contradiction )
+    simp at h
 
--- Destructing a conjunction hypothesis
+theorem plus_is_0 (n m : Nat) : n + m = 0 → n = 0 ∧ m = 0 := by
+  intro h
+  cases n with
+  | zero =>
+    constructor
+    · rfl
+    · simp at h
+      exact h
+  | succ n' => simp at h
+
 theorem and_example2 (n m : Nat) : n = 0 ∧ m = 0 → n + m = 0 := by
   intro h
   cases h with
   | intro hn hm =>
     rw [hn, hm]
-    rfl
 
 -- Alternative: using angle bracket pattern matching (more concise)
 theorem and_example2' (n m : Nat) : n = 0 ∧ m = 0 → n + m = 0 := by
@@ -89,19 +102,11 @@ theorem and_example2''' (n m : Nat) : n = 0 → m = 0 → n + m = 0 := by
   rw [hn, hm]
 
 -- Using a helper theorem
-theorem plus_is_0 (n m : Nat) : n + m = 0 → n = 0 ∧ m = 0 := by
-  intro h
-  cases n with
-  | zero =>
-    constructor
-    · rfl
-    · exact h
-  | succ n' => contradiction
-
 theorem and_example3 (n m : Nat) : n + m = 0 → n * m = 0 := by
   intro h
   have ⟨hn, hm⟩ := plus_is_0 n m h
   rw [hn]
+  rw[hm]
 
 -- Projection theorems (extracting parts of a conjunction)
 theorem proj1 (P Q : Prop) : P ∧ Q → P := by
@@ -124,7 +129,7 @@ theorem and_commut (P Q : Prop) : P ∧ Q → Q ∧ P := by
   · exact hp
 
 -- Conjunction is associative
-theorem and_assoc (P Q R : Prop) : P ∧ (Q ∧ R) → (P ∧ Q) ∧ R := by
+theorem and_assoc' (P Q R : Prop) : P ∧ (Q ∧ R) → (P ∧ Q) ∧ R := by
   intro ⟨hp, hq, hr⟩
   constructor
   · constructor
@@ -134,3 +139,5 @@ theorem and_assoc (P Q R : Prop) : P ∧ (Q ∧ R) → (P ∧ Q) ∧ R := by
 
 -- Check the type of And
 #check And -- : Prop → Prop → Prop
+
+
