@@ -1,4 +1,4 @@
-import «Poly»
+-- import «Poly»
 import Basics
 import Lean
 
@@ -285,33 +285,33 @@ theorem double_injective_take2 : forall n m, double n = double m -> n = m := by
       specialize ih n' h
       rw [ih]
 
-theorem nth_error_after_last :
-    forall (n : Nat) (X : Type) (l : List X),
-      List.length l = n ->
-      nth_error l n = none := by
-  intro n X l hlen
-  revert n
-  induction l with
-  | nil =>
-      intro n hlen
-      cases n with
-      | zero =>
-          simp [nth_error] at *
-      | succ n' =>
-          have : (0 : Nat) = Nat.succ n' := by simp at hlen
-          cases this
-  | cons x l' ih =>
-      intro n hlen
-      cases n with
-      | zero =>
-          have : Nat.succ (List.length l') = 0 := by simp at hlen
-          cases this
-      | succ n' =>
-          have hlen' : List.length l' = n' := by
-            have : Nat.succ (List.length l') = Nat.succ n' := by simpa using hlen
-            exact Nat.succ.inj this
-          -- nth_error (x::l') (succ n') = nth_error l' n'
-          simpa [nth_error] using ih n' hlen'
+-- theorem nth_error_after_last :
+--     forall (n : Nat) (X : Type) (l : List X),
+--       List.length l = n ->
+--       nth_error l n = none := by
+--   intro n X l hlen
+--   revert n
+--   induction l with
+--   | nil =>
+--       intro n hlen
+--       cases n with
+--       | zero =>
+--           simp [nth_error] at *
+--       | succ n' =>
+--           have : (0 : Nat) = Nat.succ n' := by simp at hlen
+--           cases this
+--   | cons x l' ih =>
+--       intro n hlen
+--       cases n with
+--       | zero =>
+--           have : Nat.succ (List.length l') = 0 := by simp at hlen
+--           cases this
+--       | succ n' =>
+--           have hlen' : List.length l' = n' := by
+--             have : Nat.succ (List.length l') = Nat.succ n' := by simpa using hlen
+--             exact Nat.succ.inj this
+--           -- nth_error (x::l') (succ n') = nth_error l' n'
+--           simpa [nth_error] using ih n' hlen'
 
 theorem sub_add_leb : forall n m, (Nat.ble n m) = true -> (m - n) + n = m := by
   intro n
