@@ -299,3 +299,222 @@ theorem not_true_is_false' (b : Bool) : b ≠ true → b = false := by
   cases b with
   | false => rfl
   | true => contradiction
+
+
+/- --------------------  TRUTH -------------------- -/
+
+-- True is proven by trivial or True.intro
+theorem True_is_true : True := trivial
+
+-- Alternative
+theorem True_is_true' : True := True.intro
+
+-- Using True in pattern matching (like Coq's discriminate)
+def disc_fn (n : Nat) : Prop :=
+  match n with
+  | 0 => True
+  | _ + 1 => False
+
+-- Discriminating using True/False pattern
+theorem disc_example (n : Nat) : ¬(0 = n.succ) := by
+  intro contra
+  have h : disc_fn 0 := trivial
+  rw [contra] at h
+  -- h is now False
+  exact h
+
+-- List version
+theorem nil_is_not_cons {X : Type} (x : X) (xs : List X) : ¬([] = x :: xs) := by
+  intro contra
+  have h : (match @List.nil X with
+            | [] => True
+            | _ :: _ => False) := trivial
+  rw [contra] at h
+  exact h
+
+
+/- --------------------  LOGICAL EQUIVALENCE -------------------- -/
+
+#check Iff -- Prop → Prop → Prop
+
+-- Iff is symmetric
+theorem iff_sym (P Q : Prop) : (P ↔ Q) → (Q ↔ P) := by
+  intro ⟨hab, hba⟩
+  constructor
+  · exact hba
+  · exact hab
+
+-- Using the iff we proved earlier
+theorem not_true_iff_false (b : Bool) : b ≠ true ↔ b = false := by
+  constructor
+  · exact not_true_is_false b
+  · intro h
+    rw [h]
+    intro h'
+    contradiction
+
+-- Applying iff in forward direction
+theorem apply_iff_example1 (P Q R : Prop) : (P ↔ Q) → (Q → R) → (P → R) := by
+  intro hiff h hp
+  apply h
+  apply hiff.mp  -- .mp is the forward direction (modus ponens)
+  exact hp
+
+-- Applying iff in backward direction
+theorem apply_iff_example2 (P Q R : Prop) : (P ↔ Q) → (P → R) → (Q → R) := by
+  intro hiff h hq
+  apply h
+  apply hiff.mpr  -- .mpr is the backward direction (modus ponens reverse)
+  exact hq
+
+-- Iff is reflexive
+theorem iff_refl (P : Prop) : P ↔ P := by
+  constructor <;> intro h <;> exact h
+
+-- Alternative: using Iff.intro directly
+theorem iff_refl' (P : Prop) : P ↔ P :=
+  Iff.intro id id
+
+-- Iff is transitive
+theorem iff_trans (P Q R : Prop) : (P ↔ Q) → (Q ↔ R) → (P ↔ R) := by
+  intro hpq hqr
+  constructor
+  · intro h
+    apply hqr.mp
+    apply hpq.mp
+    exact h
+  · intro h
+    apply hpq.mpr
+    apply hqr.mpr
+    exact h
+
+-- Distributivity example
+theorem or_distributes_over_and (P Q R : Prop) :
+    P ∨ (Q ∧ R) ↔ (P ∨ Q) ∧ (P ∨ R) := by
+  constructor
+  · intro h
+    cases h with
+    | inl hp =>
+      constructor
+      · left; exact hp
+      · left; exact hp
+    | inr hqr =>
+      obtain ⟨ hq, hr⟩ := hqr
+      constructor
+      · right; exact hq
+      · right; exact hr
+  · intro ⟨hpq, hpr⟩
+    cases hpq with
+    | inl hp => left; exact hp
+    | inr hq =>
+      cases hpr with
+      | inl hp => left; exact hp
+      | inr hr => right; exact ⟨hq, hr⟩
+
+
+/- -------------------- SETOIDS AND LOGICAL EQUIVALENCE -------------------- -/
+
+-- Using our earlier theorems
+theorem mul_eq_0 (n m : Nat) : n * m = 0 ↔ n = 0 ∨ m = 0 := by
+  constructor
+  · exact mult_is_0 n m
+  · exact factor_is_0 n m
+
+-- Or is associative
+theorem or_assoc' (P Q R : Prop) : P ∨ (Q ∨ R) ↔ (P ∨ Q) ∨ R := by
+  constructor
+  · intro h
+    cases h with
+    | inl hp => left; left; exact hp
+    | inr hqr =>
+      cases hqr with
+      | inl hq => left; right; exact hq
+      | inr hr => right; exact hr
+  · intro h
+    cases h with
+    | inl hpq =>
+      cases hpq with
+      | inl hp => left; exact hp
+      | inr hq => right; left; exact hq
+    | inr hr => right; right; exact hr
+
+-- Using rewrite with iff (no special import needed in Lean!)
+theorem mul_eq_0_ternary (n m p : Nat) :
+    n * m * p = 0 ↔ n = 0 ∨ m = 0 ∨ p = 0 := by
+  rw [mul_eq_0, mul_eq_0, or_assoc]
+
+
+/- ------------------ EXISTENTIAL QUANTIFICATION ----------------- -/
+
+-- Definition using existential
+def Even (x : Nat) : Prop := ∃ n : Nat, x = 2 * n
+
+#check Even -- Nat → Prop
+
+-- Proving an existential with `use`
+theorem four_is_even : Even 4 := by
+  unfold Even
+  exists 2
+
+-- Alternative: direct construction
+theorem four_is_even' : Even 4 :=
+  ⟨2, rfl⟩
+
+theorem exists_example_2 (n : Nat) :
+    (∃ m, n = 4 + m) → (∃ o, n = 2 + o) := by
+  intro ⟨m, hm⟩
+  exists (2 + m)
+  omega
+
+theorem exists_example_2' (n : Nat) :
+    (∃ m, n = 4 + m) → (∃ o, n = 2 + o) := by
+  intro h
+  obtain ⟨m, hm⟩ := h
+  exists 2 + m
+  omega
+
+-- Negating existentials
+theorem dist_not_exists {X : Type} (P : X → Prop) :
+    (∀ x, P x) → ¬(∃ x, ¬P x) := by
+  intro h1 h2
+  obtain ⟨x, h3⟩ := h2
+  have := h1 x
+  contradiction
+
+-- Existentials distribute over disjunction
+theorem dist_exists_or {X : Type} (P Q : X → Prop) :
+    (∃ x, P x ∨ Q x) ↔ (∃ x, P x) ∨ (∃ x, Q x) := by
+  constructor
+  · intro ⟨x, hpq⟩
+    cases hpq with
+    | inl hp =>
+      left
+      exists x
+    | inr hq =>
+      right
+      exists x
+  · intro h
+    cases h with
+    | inl hex =>
+      obtain ⟨ x, hp⟩ := hex
+      exists x
+      left
+      exact hp
+    | inr hex =>
+      obtain ⟨ x, hq⟩ := hex
+      exists x
+      right
+      exact hq
+
+
+-- More complex example with induction
+theorem leb_plus_exists (n m : Nat) : n ≤ m → ∃ x, m = n + x := by
+  intro h
+  exists m - n
+  omega  -- omega solves this arithmetic goal
+
+-- Reverse direction
+theorem plus_exists_leb (n m : Nat) : (∃ x, m = n + x) → n ≤ m := by
+  intro ⟨x, h⟩
+  rw [h]
+  omega
