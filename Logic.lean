@@ -518,3 +518,186 @@ theorem plus_exists_leb (n m : Nat) : (∃ x, m = n + x) → n ≤ m := by
   intro ⟨x, h⟩
   rw [h]
   omega
+
+
+/-
+  PROGRAMMING WITH PROPOSITIONS
+
+  Propositions can be defined recursively, just like functions.
+  This is very convenient for expressing properties of data structures.
+-/
+
+-- List membership: x is in list l
+-- This is a recursive proposition!
+def In {A : Type} (x : A) (l : List A) : Prop :=
+  match l with
+  | [] => False
+  | x' :: l' => x' = x ∨ In x l'
+
+-- Example: 4 is in [1,2,3,4,5]
+example : In 4 [1,2,3,4,5] := by
+  -- Unfold the definition
+  unfold In
+  right; right; right; left
+  rfl
+
+-- Using In with existentials
+example (n : Nat) : In n [2,4] → ∃ n', n = 2 * n' := by
+  intro h
+  unfold In at h
+  -- h is now: 2 = n ∨ (4 = n ∨ False)
+  cases h with
+  | inl h =>
+    exists 1
+    omega
+  | inr h =>
+    cases h with
+    | inl h =>
+      exists 2
+      omega
+    | inr h => contradiction
+
+-- In is preserved by map
+theorem In_map {A B : Type} (f : A → B) (l : List A) (x : A) :
+    In x l → In (f x) (List.map f l) := by
+  intro h
+  induction l with
+  | nil =>
+    unfold In at h
+    contradiction
+  | cons x' l' ih =>
+    unfold In at h ⊢
+    cases h with
+    | inl heq =>
+      left
+      rw [heq]
+    | inr hin =>
+      right
+      exact ih hin
+
+-- In and map: the iff version
+theorem In_map_iff {A B : Type} (f : A → B) (l : List A) (y : B) :
+    In y (List.map f l) ↔ ∃ x, f x = y ∧ In x l := by
+  constructor
+  · -- Forward direction
+    intro h
+    induction l with
+    | nil =>
+      unfold List.map In at h
+      contradiction
+    | cons x l' ih =>
+      unfold List.map In at h
+      cases h with
+      | inl heq =>
+        exists x
+        constructor
+        · exact heq
+        · left; rfl
+      | inr hin =>
+        obtain ⟨x0, hfx0, hinx0⟩ := ih hin
+        exists x0
+        constructor
+        · exact hfx0
+        · right; exact hinx0
+  · -- Backward direction
+    intro ⟨x, heq, hin⟩
+    rw [← heq]
+    exact In_map f l x hin
+
+-- In and append
+theorem In_app_iff {A : Type} (l l' : List A) (a : A) :
+    In a (l ++ l') ↔ In a l ∨ In a l' := by
+  induction l with
+  | nil =>
+    unfold In
+    simp
+  | cons a' l'' ih =>
+    simp only [In, List.cons_append]
+    constructor
+    · intro h
+      cases h with
+      | inl heq => left; left; exact heq
+      | inr hor =>
+        rw [ih] at hor  -- Apply IH to hypothesis
+        cases hor with
+        | inl hl => left; right; exact hl
+        | inr hr => right; exact hr
+    · intro h
+      cases h with
+      | inl hl =>
+        cases hl with
+        | inl heq => left; exact heq
+        | inr hin => right; rw [ih]; left; exact hin
+      | inr hr => right; rw [ih]; right; exact hr
+
+-- All elements satisfy a property
+def All {T : Type} (P : T → Prop) (l : List T) : Prop :=
+  match l with
+  | [] => True
+  | x :: l' => P x ∧ All P l'
+
+-- Relationship between All and In
+theorem All_In {T : Type} (P : T → Prop) (l : List T) :
+    (∀ x, In x l → P x) ↔ All P l := by
+  induction l with
+  | nil =>
+    unfold In All
+    constructor
+    · intro _; trivial
+    · intro _ x h; contradiction
+  | cons a l' ih =>
+    unfold In All
+    rw [← ih]
+    constructor
+    · intro h
+      constructor
+      · apply h; left; rfl
+      · intro x hin
+        apply h
+        right
+        exact hin
+    · intro ⟨hpa, hall⟩ x hor
+      cases hor with
+      | inl heq => rw [← heq]; exact hpa
+      | inr hin => exact hall x hin
+
+-- Combining properties based on a condition
+def combine_odd_even (Podd Peven : Nat → Prop) : Nat → Prop :=
+  fun n => if n % 2 = 1 then Podd n else Peven n
+
+#check combine_odd_even
+
+-- Introduction rule for combine_odd_even
+theorem combine_odd_even_intro (Podd Peven : Nat → Prop) (n : Nat) :
+    (n % 2 = 1 → Podd n) →
+    (n % 2 = 0 → Peven n) →
+    combine_odd_even Podd Peven n := by
+  intro hodd heven
+  unfold combine_odd_even
+  split
+  · apply hodd; assumption
+  · apply heven
+    -- Need to prove n % 2 = 0 from ¬(n % 2 = 1)
+    omega
+
+-- Elimination rule for odd case
+theorem combine_odd_even_elim_odd (Podd Peven : Nat → Prop) (n : Nat) :
+    combine_odd_even Podd Peven n →
+    n % 2 = 1 →
+    Podd n := by
+  intro h hodd
+  unfold combine_odd_even at h
+  split at h
+  · exact h
+  · omega
+
+-- Elimination rule for even case
+theorem combine_odd_even_elim_even (Podd Peven : Nat → Prop) (n : Nat) :
+    combine_odd_even Podd Peven n →
+    n % 2 = 0 →
+    Peven n := by
+  intro h heven
+  unfold combine_odd_even at h
+  split at h
+  · omega
+  · exact h
