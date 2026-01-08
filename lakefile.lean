@@ -23,3 +23,7 @@ lean_lib «Poly» where
 @[default_target]
 lean_lib «Tactics» where
   srcDir := "."
+
+@[default_target]
+lean_lib «Logic» where
+  srcDir := "."
