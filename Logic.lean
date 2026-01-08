@@ -701,3 +701,85 @@ theorem combine_odd_even_elim_even (Podd Peven : Nat → Prop) (n : Nat) :
   split at h
   · omega
   · exact h
+
+/- ------------------- APPLYING THEOREMS TO ARGUMENTS --------------- -/
+
+-- Checking types of functions and theorems
+#check Nat.add -- Nat → Nat → Nat
+#check @List.reverse -- {α : Type u_1} → List α → List α
+
+-- Our commutativity theorem
+axiom add_comm : ∀ n m : Nat, n + m = m + n
+
+-- Check its type
+#check add_comm -- ∀ (n m : Nat), n + m = m + n
+
+-- Using rewrite: the problem
+theorem add_comm3_attempt (x y z : Nat) : x + (y + z) = (z + y) + x := by
+  rw [add_comm]
+  rw [add_comm]
+  -- We're back where we started!
+  sorry
+
+-- Solution 1: Use assert (have in Lean)
+theorem add_comm3_take2 (x y z : Nat) : x + (y + z) = (z + y) + x := by
+  rw [add_comm]
+  have h : y + z = z + y := by
+    rw [add_comm]
+  rw [h]
+
+-- Solution 2: Apply theorem with specific arguments
+theorem add_comm3_take3 (x y z : Nat) : x + (y + z) = (z + y) + x := by
+  rw [add_comm]
+  rw [add_comm y z]
+
+-- Solution 3: Apply theorem to both parts explicitly
+theorem add_comm3_take4 (x y z : Nat) : x + (y + z) = (z + y) + x := by
+  rw [add_comm x (y + z)]
+  rw [add_comm y z]
+
+-- In is nonempty
+theorem in_not_nil {A : Type} (x : A) (l : List A) : In x l → l ≠ [] := by
+  intro h hl
+  rw [hl] at h
+  unfold In at h
+  exact h
+
+-- Trying to apply without specifying x
+example (l : List Nat) : In 42 l → l ≠ [] := by
+  intro h
+  -- apply in_not_nil  -- This would fail: can't infer x
+  -- Instead we need to specify x
+  sorry
+
+-- Solution 1: Specify x with named argument
+theorem in_not_nil_42_take2 (l : List Nat) : In 42 l → l ≠ [] := by
+  intro h
+  apply in_not_nil (x := 42)
+  exact h
+
+-- Solution 2: Apply to the hypothesis
+theorem in_not_nil_42_take3 (l : List Nat) : In 42 l → l ≠ [] := by
+  intro h
+  have := in_not_nil 42 l h  -- Apply theorem to hypothesis
+  exact this
+
+-- Solution 3: Explicit type application
+theorem in_not_nil_42_take4 (l : List Nat) : In 42 l → l ≠ [] := by
+  intro h
+  apply (in_not_nil (A := Nat) (x := 42))
+  exact h
+
+-- Solution 4: Using underscore for inference
+theorem in_not_nil_42_take5 (l : List Nat) : In 42 l → l ≠ [] := by
+  intro h
+  exact (in_not_nil _ _ h)
+
+-- Using projection and theorem application
+example {n : Nat} {ns : List Nat} :
+    In n (List.map (fun m => m * 0) ns) → n = 0 := by
+  intro h
+  -- Apply In_map_iff and extract witness
+  have ⟨m, hm, _⟩ := (In_map_iff _ _ _).mp h
+  -- Now m * 0 = n, so n = 0
+  omega
