@@ -1,6 +1,7 @@
 -- Logic.lean
 import Tactics
 
+
 #check (∀ n m : Nat, n + m = m + n )
 #check (2=2 : Prop)
 #check (3=2 : Prop)
@@ -783,3 +784,238 @@ example {n : Nat} {ns : List Nat} :
   have ⟨m, hm, _⟩ := (In_map_iff _ _ _).mp h
   -- Now m * 0 = n, so n = 0
   omega
+
+
+/- ------------------- WORKING WITH DECIDABLE PROPERTIES --------------
+
+  Two ways to express claims:
+  1. Bool (decidable, computational)
+  2. Prop (logical, may be undecidable) ------------------ -/
+
+
+-- Boolean version: computational check
+def even_bool (n : Nat) : Bool :=
+  n % 2 == 0
+
+-- Propositional version: existential claim
+def Even' (n : Nat) : Prop :=
+  ∃ k, n = double k
+
+-- Both ways work for concrete numbers
+example : even_bool 42 = true := by
+  rfl
+
+example : Even 42 := by
+  unfold Even
+  exists 21
+
+-- Helper lemmas
+theorem even_double (k : Nat) : even_bool (double k) = true := by
+  induction k with
+  | zero =>
+    rfl
+  | succ k' ih =>
+    simp [double, even_bool] at *
+    omega
+
+theorem even_S (n : Nat) : even_bool (n + 1) = !even_bool n := by
+  simp [even_bool]
+  cases Nat.mod_two_eq_zero_or_one n with
+  | inl h0 =>
+      have h1 : (n + 1) % 2 = 1 := by
+        simp [Nat.add_mod, h0]
+      simp [h0, h1]
+  | inr h1 =>
+      have h0 : (n + 1) % 2 = 0 := by
+        simp [Nat.add_mod, h1]
+      simp [h1, h0]
+
+theorem even_double_conv (n : Nat) :
+    ∃ k, n = if even_bool n then double k else (double k).succ := by
+  induction n with
+  | zero =>
+    exists 0
+  | succ n' ih =>
+    obtain ⟨k, hk⟩ := ih
+    -- Coq: destruct (even n) eqn:Hev
+    by_cases he : even_bool n' = true
+    · exists k
+      rw [even_S, he]
+      simp
+      simp [he] at hk
+      rw [hk]
+    · exists k + 1
+      rw [even_S]
+      rw [Bool.eq_false_iff.mpr he]
+      simp
+      simp [he] at hk
+      rw [hk]
+      simp [double]
+
+theorem double_eq_two_mul (n : Nat) : double n = 2 * n := by
+  induction n with
+  | zero => rfl
+  | succ n' ih =>
+    unfold double
+    rw [ih]
+    omega
+
+-- Main theorem: Bool and Prop versions are equivalent
+theorem even_bool_prop (n : Nat) :
+    even_bool n = true ↔ Even n := by
+  constructor
+  · intro h
+    obtain ⟨ k, hk⟩ := even_double_conv n
+    rw[h] at hk
+    simp at hk
+    exists k
+    rw [double_eq_two_mul] at hk
+    exact hk
+  · intro ⟨k, hk⟩
+    rw [hk]
+    simp[even_bool]
+
+-- Boolean equality
+theorem beq_true' (n m : Nat) :
+    (n == m) = true → n = m := by
+  intro h
+  induction n generalizing m with
+  | zero =>
+    cases m
+    · rfl
+    · contradiction
+  | succ n' ih =>
+    cases m
+    · contradiction
+    · simp at h
+      omega
+
+theorem eqb_refl (n : Nat) : (n == n) = true := by
+  induction n with
+  | zero => rfl
+  | succ n' ih => simp
+
+theorem beq_eq (n m : Nat) : (n == m) = true ↔ n = m := by
+  constructor
+  · exact beq_true' n m
+  · intro h
+    rw [h]
+    exact eqb_refl m
+
+-- Example: is_even_prime
+def is_even_prime (n : Nat) : Bool :=
+  if n == 2 then true else false
+
+-- Three ways to prove Even 1000
+
+example : Even 1000 := by
+  unfold Even
+  exists 500
+
+example : even_bool 1000 = true := by
+  rfl
+
+example : Even 1000 := by
+  rw [← even_bool_prop]
+  rfl
+
+-- Negation is easier with booleans
+example : even_bool 1001 = false := by
+  rfl
+
+-- Using boolean in proofs
+theorem plus_beq_example (n m p : Nat) :
+    (n == m) = true → (n + p == m + p) = true := by
+  intro h
+  rw [beq_eq] at h
+  rw [h, beq_eq]
+
+-- Logical connectives as booleans
+
+theorem andb_true_iff (b1 b2 : Bool) :
+    (b1 && b2) = true ↔ b1 = true ∧ b2 = true := by
+  constructor
+  · intro h
+    cases b1 <;> cases b2 <;> simp at h ⊢
+  · intro h
+    obtain ⟨h1, h2⟩ := h
+    rw [h1, h2]
+    simp
+
+theorem orb_true_iff (b1 b2 : Bool) :
+    (b1 || b2) = true ↔ b1 = true ∨ b2 = true := by
+  constructor
+  · intro h
+    cases b1 <;> cases b2
+    · contradiction
+    · right; rfl
+    · left; rfl
+    · left; rfl
+  · intro h
+    cases h with
+    | inl h => rw [h]; cases b2 <;> rfl
+    | inr h => rw [h]; cases b1 <;> rfl
+
+-- Boolean not-equal
+theorem beq_neq (x y : Nat) :
+    (x == y) = false ↔ x ≠ y := by
+  constructor
+  · intro h contra
+    rw [← beq_eq] at contra
+    rw [h] at contra
+    contradiction
+  · intro h
+    by_cases heq : x = y
+    · contradiction
+    · cases hb : (x == y)
+      · rfl
+      · rw [beq_eq] at hb
+        contradiction
+
+-- List equality function
+def eqb_list {A : Type} (eqb : A → A → Bool) (l1 l2 : List A) : Bool :=
+  match l1, l2 with
+  | [], [] => true
+  | [], _ => false
+  | _, [] => false
+  | x1 :: l1', x2 :: l2' => eqb x1 x2 && eqb_list eqb l1' l2'
+
+-- Correctness theorem for eqb_list
+theorem eqb_list_true_iff {A : Type} (eqb : A → A → Bool)
+    (h : ∀ a1 a2, eqb a1 a2 = true ↔ a1 = a2)
+    (l1 l2 : List A) :
+    eqb_list eqb l1 l2 = true ↔ l1 = l2 := by
+  constructor
+  · -- Forward direction
+    intro heq
+    induction l1 generalizing l2 with
+    | nil =>
+      cases l2
+      · rfl
+      · contradiction
+    | cons x1 l1' ih =>
+      cases l2 with
+      | nil => contradiction
+      | cons x2 l2' =>
+        unfold eqb_list at heq
+        rw [andb_true_iff] at heq
+        obtain ⟨h1, h2⟩ := heq
+        rw [h] at h1
+        rw[h1, ih l2' h2]
+  · -- Backward direction
+    intro heq
+    induction l1 generalizing l2 with
+    | nil =>
+      rw [← heq]
+      rfl
+    | cons x1 l1' ih =>
+      cases l2 with
+      | nil => contradiction
+      | cons x2 l2' =>
+        unfold eqb_list
+        simp only [List.cons.injEq] at heq
+        obtain ⟨ hx, hl ⟩ := heq
+        rw [andb_true_iff]
+        constructor
+        · rw [h, hx]
+        · exact ih l2' hl
