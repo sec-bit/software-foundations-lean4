@@ -1019,3 +1019,227 @@ theorem eqb_list_true_iff {A : Type} (eqb : A → A → Bool)
         constructor
         · rw [h, hx]
         · exact ih l2' hl
+
+
+/- --------------------- THE LOGIC OF LEAN ------------------------------ -/
+
+/- -------------------- FUNCTIONAL EXTENSIONALITY -----------------------
+
+  Two functions are equal if they produce the same output for every input.
+
+  In Coq: This requires an axiom.
+  In Lean: This is BUILT-IN! Using the `funext` tactic.
+-/
+
+-- This works by computation (functions are definitionally equal)
+example : (fun x => 3 + x) = (fun x => (Nat.pred 4) + x) := by
+  rfl
+
+-- This doesn't work by computation
+example : (fun x => x + 1) = (fun x => 1 + x) := by
+  funext x  -- Introduce x, now prove x + 1 = 1 + x
+  exact Nat.add_comm x 1
+
+-- No axiom needed! `funext` is built into Lean's type theory
+
+-- Example: tail-recursive reverse
+def rev_append {X : Type} (l1 l2 : List X) : List X :=
+  match l1 with
+  | [] => l2
+  | x :: l1' => rev_append l1' (x :: l2)
+
+def tr_rev {X : Type} (l : List X) : List X :=
+  rev_append l []
+
+-- Helper lemma
+theorem rev_append_nil {X : Type} (l1 l2 : List X) :
+    rev_append l1 l2 = rev_append l1 [] ++ l2 := by
+  induction l1 generalizing l2 with
+  | nil => simp [rev_append]
+  | cons x l1' ih =>
+    simp only [rev_append]
+    rw [ih (l2 := x :: l2), ih (l2 := [x])]
+    simp [List.append_assoc, List.cons_append]
+
+-- Main theorem: prove two functions are equal
+theorem rev_append_eq {X : Type} (l1 l2 : List X) :
+    rev_append l1 l2 = List.reverse l1 ++ l2 := by
+  induction l1 generalizing l2 with
+  | nil => simp [rev_append]
+  | cons x l1' ih =>
+    simp only [rev_append, List.reverse_cons]
+    rw [ih]
+    simp [List.append_assoc]
+
+-- Then the main theorem is easy
+theorem tr_rev_correct {X : Type} : @tr_rev X = @List.reverse X := by
+  funext l
+  unfold tr_rev
+  rw [rev_append_eq]
+  simp
+
+-- Check which axioms we used
+#print axioms tr_rev_correct
+
+/- -------------------- CLASSICAL VS CONSTRUCTIVE LOGIC -----------------
+
+  Lean is constructive by default but has classical logic available.
+-/
+
+-- The Law of Excluded Middle (not provable constructively)
+def excluded_middle := ∀ P : Prop, P ∨ ¬P
+
+-- Restricted version (for decidable propositions)
+theorem restricted_excluded_middle (P : Prop) (b : Bool)
+    (h : P ↔ b = true) : P ∨ ¬P := by
+  cases b
+  · right
+    intro hp
+    rw [h] at hp
+    contradiction
+  · left
+    rw [h]
+
+-- For equality on Nat (decidable)
+theorem restricted_excluded_middle_eq (n m : Nat) :
+    n = m ∨ n ≠ m := by
+  cases Nat.decEq n m with
+  | isTrue h => left; exact h
+  | isFalse h => right; exact h
+
+-- Even without full excluded middle, we can prove ¬¬(P ∨ ¬P)
+theorem excluded_middle_irrefutable (P : Prop) :
+    ¬¬(P ∨ ¬P) := by
+  intro h
+  apply h
+  right
+  intro hp
+  apply h
+  left
+  exact hp
+
+-- Classical logic is needed for some theorems
+theorem not_exists_dist :
+    excluded_middle →
+    ∀ (X : Type) (P : X → Prop),
+      ¬(∃ x, ¬P x) → (∀ x, P x) := by
+  intro em X P hne x
+  cases em (P x) with
+  | inl hpx => exact hpx
+  | inr hnpx =>
+    exfalso
+    apply hne
+    exists x
+
+
+/- ------------------- CLASSICAL LOGIC IN LEAN --------------------
+
+  To use classical logic, import and open the Classical namespace.
+-/
+
+-- Now we can use classical reasoning
+open Classical
+
+-- Excluded middle is available
+example (P : Prop) : P ∨ ¬P := em P
+
+-- Double negation elimination
+example (P : Prop) : ¬¬P → P := byContradiction
+
+-- Proof by contradiction tactic
+example (P Q : Prop) (h : ¬Q → ¬P) : P → Q := by
+  intro hp
+  apply Classical.byContradiction
+  intro hnq
+  exact h hnq hp
+
+def peirce := ∀ P Q : Prop, ((P → Q) → P) → P
+
+def double_negation_elimination := ∀ P : Prop, ¬¬P → P
+
+def de_morgan_not_and_not := ∀ P Q : Prop, ¬(¬P ∧ ¬Q) → P ∨ Q
+
+def implies_to_or := ∀ P Q : Prop, (P → Q) → (¬P ∨ Q)
+
+def consequentia_mirabilis := ∀ P : Prop, (¬P → P) → P
+
+-- Peirce's law implies double negation elimination
+theorem peirce_double_negation_elimination :
+    peirce → double_negation_elimination := by
+  intro hp
+  unfold peirce double_negation_elimination at *
+  intro P hnnp
+  apply hp (Q := False)
+  intro hnp
+  exfalso
+  exact hnnp hnp
+
+-- Double negation elimination implies De Morgan's law
+theorem double_negation_elimination_de_morgan_not_and_not :
+    double_negation_elimination → de_morgan_not_and_not := by
+  intro hdne
+  unfold double_negation_elimination de_morgan_not_and_not at *
+  intro P Q h
+  apply hdne
+  intro hnpq
+  apply h
+  constructor
+  · intro hp
+    apply hnpq
+    left
+    exact hp
+  · intro hq
+    apply hnpq
+    right
+    exact hq
+
+-- De Morgan implies (P → Q) → (¬P ∨ Q)
+theorem de_morgan_not_and_not_implies_to_or :
+    de_morgan_not_and_not → implies_to_or := by
+  intro hdm
+  unfold de_morgan_not_and_not implies_to_or at *
+  intro P Q hpq
+  apply hdm
+  intro ⟨hnnp, hnq⟩
+  apply hnnp
+  intro hp
+  exact hnq (hpq hp)
+
+-- (P → Q) → (¬P ∨ Q) implies excluded middle
+theorem implies_to_or_excluded_middle :
+    implies_to_or → excluded_middle := by
+  intro hi
+  unfold implies_to_or excluded_middle at *
+  intro P
+  have := hi P P (fun x => x)
+  cases this with
+  | inl h => right; exact h
+  | inr h => left; exact h
+
+-- Excluded middle implies consequentia mirabilis
+theorem excluded_middle_consequentia_mirabilis :
+    excluded_middle → consequentia_mirabilis := by
+  intro hem
+  unfold excluded_middle consequentia_mirabilis at *
+  intro P hnpp
+  cases hem P with
+  | inl hp => exact hp
+  | inr hnp => exact hnpp hnp
+
+-- Consequentia mirabilis implies Peirce
+theorem consequentia_mirabilis_peirce :
+    consequentia_mirabilis → peirce := by
+  intro hcm
+  unfold consequentia_mirabilis peirce at *
+  intro P Q hpqp
+  apply hcm
+  intro hnp
+  exfalso
+  have : ¬(P → Q) := by
+    intro hpq
+    exact hnp (hpqp hpq)
+  apply this
+  intro hp
+  contradiction
+
+-- All five principles are equivalent (and all equivalent to excluded middle)
