@@ -1,4 +1,5 @@
 import Basics
+import Logic
 
 namespace IndProp
 
@@ -168,6 +169,19 @@ theorem ev_double : ∀ n, ev (double n) := by
             simp [double]
             exact ev_SS (double n') IHn'
 
+-- extra
+theorem double_eq_add_self : ∀ n, double n = n + n := by
+  intro n
+  induction n with
+  | zero => rfl
+  | succ n' ih =>
+    simp [double, ih]
+    omega
+
+theorem double_eq_two_mul : ∀ n, double n = 2 * n := by
+  intro n
+  rw [double_eq_add_self, Nat.two_mul]
+
 theorem Perm3_rev : Perm3 [1,2,3] [3,2,1] := by
   apply Perm3.perm3_trans (l2 := [2,3,1])
   . apply Perm3.perm3_trans (l2 := [2,1,3])
@@ -187,7 +201,9 @@ theorem Perm3_refl : forall (X : Type ) (a b c : X),
     . apply Perm3.perm3_swap12
     . apply Perm3.perm3_swap12
 
--- USING EVIDENCE IN PROOFS
+-- ------------------ ------------------ ------------------ ------------------
+-- ------------------ USING EVIDENCE IN PROOFS -----------------------
+-- ------------------ ------------------ ------------------ ------------------
 
 open Nat
 
@@ -198,3 +214,97 @@ theorem ev_inversion : forall (n : Nat),
   | ev_0 => simp
   | ev_SS n' E' => right
                    exists n'
+
+theorem evSS_ev : ∀ n, ev (n + 2 ) → ev n := by
+  intro n E
+  cases E with
+  | ev_SS _ E' => exact E'
+
+theorem evSS_ev' : ∀ n, ev (n + 2) → ev n := by
+  intro n E
+  match E with
+  | ev.ev_SS _ E' => exact E'
+
+theorem one_not_even : ¬ ev 1 := by
+  intro H
+  cases H
+
+theorem one_not_even' : ¬ ev 1 := fun H => nomatch H
+
+
+theorem SSSSev_even : ∀ n, ev (n + 4) → ev n := by
+  intro n H
+  cases H with
+  | ev_SS _ H' =>
+    cases H' with
+    | ev_SS _ H'' => exact H''
+
+theorem ev5_nonsense : ev 5 → 2 + 2 = 9 := by
+  intro H
+  cases H with
+  | ev_SS _ H' =>
+    cases H' with
+    | ev_SS _ H'' => cases H''
+
+-- H'' : ev 1, which is impossible, so `cases H''` closes the goal.
+
+theorem inversion_ex1 : ∀ n m o : Nat, [n, m] = [o, o] → [n] = [m] := by
+  intro n m o H
+  injection H with h1 h2
+  injection h2 with h3
+  rw [h1, h3]
+
+theorem inversion_ex2 : ∀ n : Nat, n + 1 = 0 → 2 + 2 = 5 := by
+  intro n contra
+  contradiction
+
+-- ------------------ INDUCTION ON EVIDENCE ------------------
+
+
+theorem ev_Even : ∀ n, ev n → Even n := by
+  intro n E
+  induction E with
+  | ev_0 => exact ⟨0, rfl⟩
+  | ev_SS n' _ ih =>
+    obtain ⟨k, hk⟩ := ih
+    exact ⟨k + 1, by simp [hk]; omega⟩
+
+theorem ev_Even_iff : ∀ n, ev n ↔ Even n := by
+  intro n
+  constructor
+  · exact ev_Even n
+  · intro ⟨k, hk⟩
+    rw [hk, <- double_eq_two_mul]
+    exact ev_double k
+
+theorem ev_sum : ∀ n m, ev n → ev m → ev (n + m) := by
+  intro n m En Em
+  induction En with
+  | ev_0 => simp; exact Em
+  | ev_SS n' _ ih =>
+    -- goal: ev (n' + 2 + m)
+    have h : n' + 2 + m = (n' + m) + 2 := by omega
+    rw [h]
+    exact ev.ev_SS (n' + m) ih
+
+theorem ev_ev__ev : ∀ n m, ev (n + m) → ev n → ev m := by
+  intro n m E1 E2
+  induction E2 with
+  | ev_0 => simp at E1; exact E1
+  | ev_SS n' _ ih =>
+    apply ih
+    -- E1 : ev (n' + 2 + m), need ev (n' + m)
+    have h : n' + 2 + m = (n' + m) + 2 := by omega
+    rw [h] at E1
+    cases E1 with
+    | ev_SS _ E' => exact E'
+
+theorem ev_plus_plus : ∀ n m p, ev (n + m) → ev (n + p) → ev (m + p) := by
+  intro n m p Enm Enp
+  apply ev_ev__ev (n + n)
+  · have H : ev ((n + m) + (n + p)) := ev_sum _ _ Enm Enp
+    have h : (n + m) + (n + p) = (n + n) + (m + p) := by omega
+    rw [h] at H
+    exact H
+  · rw [← double_eq_add_self]
+    exact ev_double n
