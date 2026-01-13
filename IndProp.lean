@@ -308,3 +308,73 @@ theorem ev_plus_plus : ∀ n m p, ev (n + m) → ev (n + p) → ev (m + p) := by
     exact H
   · rw [← double_eq_add_self]
     exact ev_double n
+
+-- ============================================
+-- MULTIPLE INDUCTION HYPOTHESES
+-- ============================================
+
+inductive ev' : Nat → Prop where
+  | ev'_0 : ev' 0
+  | ev'_2 : ev' 2
+  | ev'_sum (n m : Nat) (Hn : ev' n) (Hm : ev' m) : ev' (n + m)
+
+theorem ev'_ev : ∀ n, ev' n ↔ ev n := by
+  intro n
+  constructor
+  · intro H
+    induction H with
+    | ev'_0 => exact ev.ev_0
+    | ev'_2 => exact ev.ev_SS 0 ev.ev_0
+    | ev'_sum n m _ _ ih1 ih2 => exact ev_sum n m ih1 ih2
+  · intro H
+    induction H with
+    | ev_0 => exact ev'.ev'_0
+    | ev_SS n _ ih =>
+      have h : n + 2 = 2 + n := by omega
+      rw [h]
+      exact ev'.ev'_sum 2 n ev'.ev'_2 ih
+
+theorem Perm3_symm : ∀ (X : Type) (l1 l2 : List X), Perm3 l1 l2 → Perm3 l2 l1 := by
+  intro X l1 l2 E
+  induction E with
+  | perm3_swap12 a b c => exact Perm3.perm3_swap12 b a c
+  | perm3_swap23 a b c => exact Perm3.perm3_swap23 a c b
+  | perm3_trans l1 l2 l3 _ _ ih12 ih23 =>
+    exact Perm3.perm3_trans l3 l2 l1 ih23 ih12
+
+theorem Perm3_In : ∀ (X : Type) (x : X) (l1 l2 : List X),
+    Perm3 l1 l2 → In x l1 → In x l2 := by
+  intro X x l1 l2 HPerm HIn
+  induction HPerm with
+  | perm3_swap12 a b c =>
+    simp only [In] at *
+    rcases HIn with rfl | rfl | rfl | h
+    · right; left; rfl
+    · left; rfl
+    · right; right; left; rfl
+    · exact h.elim
+  | perm3_swap23 a b c =>
+    simp only [In] at *
+    rcases HIn with rfl | rfl | rfl | h
+    · left; rfl
+    · right; right; left; rfl
+    · right; left; rfl
+    · exact h.elim
+  | perm3_trans _ _ _ _ _ ih1 ih2 =>
+    exact ih2 (ih1 HIn)
+
+theorem Perm3_NotIn : ∀ (X : Type) (x : X) (l1 l2 : List X),
+    Perm3 l1 l2 → ¬In x l1 → ¬In x l2 := by
+  intro X x l1 l2 HPerm HNotIn contra
+  apply HNotIn
+  exact Perm3_In X x l2 l1 (Perm3_symm X l1 l2 HPerm) contra
+
+example : ¬ Perm3 [1, 2, 3] [1, 2, 4] := by
+  intro contra
+  have H : In 3 [1, 2, 4] := Perm3_In Nat 3 _ _ contra (by simp [In])
+  simp only [In] at H
+  rcases H with h | h | h | h
+  · omega
+  · omega
+  · omega
+  · exact h
