@@ -378,3 +378,289 @@ example : ¬ Perm3 [1, 2, 3] [1, 2, 4] := by
   · omega
   · omega
   · exact h
+
+-- ============================================
+-- EXERCISING WITH INDUCTIVE RELATIONS
+-- ============================================
+
+namespace Playground
+
+inductive Le : Nat → Nat → Prop where
+  | le_n (n : Nat) : Le n n
+  | le_S (n m : Nat) (H : Le n m) : Le n (m + 1)
+
+def Lt (n m : Nat) := Le (n + 1) m
+def Ge (m n : Nat) := Le n m
+
+end Playground
+
+open Playground.Le
+open Playground (Le Lt Ge)
+
+theorem test_le1 : Le 3 3 := le_n 3
+
+theorem test_le2 : Le 3 6 := le_S 3 5 (le_S 3 4 (le_S 3 3 (le_n 3)))
+
+theorem test_le3 : Le 2 1 → 2 + 2 = 5 := by
+  intro H
+  contradiction
+
+theorem Le_trans : ∀ m n o, Le m n → Le n o → Le m o := by
+  intro m n o Emn Eno
+  induction Eno with
+  | le_n => exact Emn
+  | le_S o' _ ih => exact le_S m o' ih
+
+theorem O_Le_n : ∀ n, Le 0 n := by
+  intro n
+  induction n with
+  | zero => exact le_n 0
+  | succ n' ih => exact le_S 0 n' ih
+
+theorem n_Le_m__Sn_Le_Sm : ∀ n m, Le n m → Le (n + 1) (m + 1) := by
+  intro n m H
+  induction H with
+  | le_n => exact le_n (n + 1)
+  | le_S m' _ ih => exact le_S (n + 1) (m' + 1) ih
+
+theorem Sn_Le_Sm__n_Le_m : ∀ n m, Le (n + 1) (m + 1) → Le n m := by
+  intro n m H
+  cases H with
+  | le_n => exact le_n n
+  | le_S m' H' =>
+    apply Le_trans n (n + 1) m
+    · exact le_S n n (le_n n)
+    · exact H'
+
+
+theorem Le_plus_l : ∀ a b, Le a (a + b) := by
+  intro a b
+  induction b with
+  | zero => simp; exact le_n a
+  | succ b' ih =>
+    have h : a + (b' + 1) = (a + b') + 1 := by omega
+    rw [h]
+    exact le_S a (a + b') ih
+
+theorem plus_Le : ∀ n1 n2 m, Le (n1 + n2) m → Le n1 m ∧ Le n2 m := by
+  intro n1 n2 m H
+  constructor
+  · exact Le_trans n1 (n1 + n2) m (Le_plus_l n1 n2) H
+  · have h : Le n2 (n2 + n1) := Le_plus_l n2 n1
+    have h2 : n2 + n1 = n1 + n2 := by omega
+    rw [h2] at h
+    exact Le_trans n2 (n1 + n2) m h H
+
+theorem plus_Le_cases : ∀ n m p q, Le (n + m) (p + q) → Le n p ∨ Le m q := by
+  intro n
+  induction n with
+  | zero => intros; left; exact O_Le_n _
+  | succ n' ih =>
+    intro m p q H
+    cases p with
+    | zero =>
+      right
+      have ⟨_, h2⟩ := plus_Le (n' + 1) m (0 + q) H
+      simp at h2
+      exact h2
+    | succ p' =>
+      have h : (n' + 1) + m = n' + (m + 1) := by omega
+      have h2 : (p' + 1) + q = p' + (q + 1) := by omega
+      rw [h, h2] at H
+      cases ih (m + 1) p' (q + 1) H with
+      | inl hl => left; exact n_Le_m__Sn_Le_Sm n' p' hl
+      | inr hr => right; exact Sn_Le_Sm__n_Le_m m q hr
+
+theorem plus_Le_compat_l : ∀ n m p, Le n m → Le (p + n) (p + m) := by
+  intro n m p H
+  induction p with
+  | zero => simp; exact H
+  | succ p' ih =>
+    have h1 : (p' + 1) + n = (p' + n) + 1 := by omega
+    have h2 : (p' + 1) + m = (p' + m) + 1 := by omega
+    rw [h1, h2]
+    exact n_Le_m__Sn_Le_Sm (p' + n) (p' + m) ih
+
+theorem plus_Le_compat_r : ∀ n m p, Le n m → Le (n + p) (m + p) := by
+  intro n m p H
+  have h1 : n + p = p + n := by omega
+  have h2 : m + p = p + m := by omega
+  rw [h1, h2]
+  exact plus_Le_compat_l n m p H
+
+theorem Le_plus_trans : ∀ n m p, Le n m → Le n (m + p) := by
+  intro n m p H
+  induction p with
+  | zero => simp; exact H
+  | succ p' ih =>
+    have h : m + (p' + 1) = (m + p') + 1 := by omega
+    rw [h]
+    exact le_S n (m + p') ih
+
+theorem Lt_Ge_cases : ∀ n m, Lt n m ∨ Ge n m := by
+  intro n m
+  cases m with
+  | zero => right; unfold Ge; exact O_Le_n n
+  | succ m' =>
+    induction n with
+    | zero => left; unfold Lt; exact n_Le_m__Sn_Le_Sm 0 m' (O_Le_n m')
+    | succ n' ih =>
+      cases ih with
+      | inl hl =>
+        unfold Lt at hl
+        cases hl with
+        | le_n => right; unfold Ge; exact le_n _
+        | le_S k H => left; unfold Lt; exact n_Le_m__Sn_Le_Sm _ _ H
+      | inr hr =>
+        unfold Ge at hr
+        right; unfold Ge; exact le_S _ _ hr
+
+theorem n_Lt_m__n_Le_m : ∀ n m, Lt n m → Le n m := by
+  intro n m H
+  unfold Lt at H
+  exact Le_trans n (n + 1) m (le_S n n (le_n n)) H
+
+theorem plus_Lt : ∀ n1 n2 m, Lt (n1 + n2) m → Lt n1 m ∧ Lt n2 m := by
+  intro n1 n2 m H
+  unfold Lt at *
+  constructor
+  · apply Le_trans (n1 + 1) ((n1 + n2) + 1) m
+    · exact n_Le_m__Sn_Le_Sm n1 (n1 + n2) (Le_plus_l n1 n2)
+    · exact H
+  · apply Le_trans (n2 + 1) ((n1 + n2) + 1) m
+    · have h : Le n2 (n1 + n2) := by
+        have h' : n2 + n1 = n1 + n2 := by omega
+        rw [← h']; exact Le_plus_l n2 n1
+      exact n_Le_m__Sn_Le_Sm n2 (n1 + n2) h
+    · exact H
+
+-- For leb theorems, using Nat.ble from stdlib
+
+theorem leb_complete : ∀ n m, Nat.ble n m = true → Le n m := by
+  intro n m
+  induction n generalizing m with
+  | zero => intro _; exact O_Le_n m
+  | succ n' ih =>
+    intro H
+    cases m with
+    | zero => contradiction
+    | succ m' =>
+      apply n_Le_m__Sn_Le_Sm
+      apply ih
+      exact H
+
+theorem leb_correct : ∀ n m, Le n m → Nat.ble n m = true := by
+  intro n m H
+  induction H with
+  | le_n =>
+    induction n with
+    | zero => rfl
+    | succ n' ih => simp [Nat.ble]
+  | le_S m _ ih =>
+    cases n with
+    | zero => rfl
+    | succ n' =>
+      simp [Nat.ble] at ih ⊢
+      cases m with
+      | zero => simp at ih
+      | succ m' => simp at ih ⊢; omega
+
+theorem leb_iff : ∀ n m, Nat.ble n m = true ↔ Le n m := by
+  intro n m
+  constructor
+  · exact leb_complete n m
+  · exact leb_correct n m
+
+theorem leb_true_trans : ∀ n m o,
+    Nat.ble n m = true → Nat.ble m o = true → Nat.ble n o = true := by
+  intro n m o Hnm Hmo
+  apply leb_correct
+  apply Le_trans n m o
+  · exact leb_complete n m Hnm
+  · exact leb_complete m o Hmo
+
+namespace R
+
+inductive R : Nat → Nat → Nat → Prop where
+  | c1 : R 0 0 0
+  | c2 (m n o : Nat) (H : R m n o) : R (m + 1) n (o + 1)
+  | c3 (m n o : Nat) (H : R m n o) : R m (n + 1) (o + 1)
+  | c4 (m n o : Nat) (H : R (m + 1) (n + 1) (o + 2)) : R m n o
+  | c5 (m n o : Nat) (H : R m n o) : R n m o
+
+def fR : Nat → Nat → Nat := Nat.add
+
+open R
+
+theorem R_equiv_fR : ∀ m n o, R m n o ↔ fR m n = o := by
+  intro m n o
+  constructor
+  · intro H
+    induction H with
+    | c1 => rfl
+    | c2 m n o _ ih => simp [fR] at *; omega
+    | c3 m n o _ ih => simp [fR] at *; omega
+    | c4 m n o _ ih => simp [fR] at *; omega
+    | c5 m n o _ ih => simp [fR] at *; omega
+  · intro H
+    induction m generalizing n o with
+    | zero =>
+      simp [fR] at H
+      subst H
+      induction n with
+      | zero => exact c1
+      | succ n' ih => exact c3 0 n' n' ih
+    | succ m' ih =>
+      simp [fR] at H
+      subst H
+      have h : m' + 1 + n = (m' + n) + 1 := by omega
+      rw [h]
+      exact c2 m' n (m' + n) (ih n (m' + n) rfl)
+
+end R
+
+inductive Subseq : List Nat → List Nat → Prop where
+  | nil (l : List Nat) : Subseq [] l
+  | cons_both (x : Nat) (l1 l2 : List Nat) (H : Subseq l1 l2) : Subseq (x :: l1) (x :: l2)
+  | cons_right (x : Nat) (l1 l2 : List Nat) (H : Subseq l1 l2) : Subseq l1 (x :: l2)
+
+open Subseq
+
+theorem Subseq_refl : ∀ l : List Nat, Subseq l l := by
+  intro l
+  induction l with
+  | nil => exact nil []
+  | cons x l' ih => exact cons_both x l' l' ih
+
+theorem Subseq_app : ∀ l1 l2 l3 : List Nat, Subseq l1 l2 → Subseq l1 (l2 ++ l3) := by
+  intro l1 l2 l3 H
+  induction H with
+  | nil _ => exact nil _
+  | cons_both x l1 l2 _ ih => exact cons_both x l1 (l2 ++ l3) ih
+  | cons_right x l1 l2 _ ih => exact cons_right x l1 (l2 ++ l3) ih
+
+theorem Subseq_trans : ∀ l1 l2 l3 : List Nat,
+    Subseq l1 l2 → Subseq l2 l3 → Subseq l1 l3 := by
+  intro l1 l2 l3 H12 H23
+  induction H23 generalizing l1 with
+  | nil _ =>
+    cases H12 with
+    | nil _ => exact nil _
+  | cons_both x l2 l3 _ ih =>
+    cases H12 with
+    | nil _ => exact nil _
+    | cons_both _ l1' _ H12' => exact cons_both x l1' l3 (ih l1' H12')
+    | cons_right _ l1 _ H12' => exact cons_right x l1 l3 (ih l1 H12')
+  | cons_right x l2 l3 _ ih => exact cons_right x l1 l3 (ih l1 H12)
+
+inductive TotalRelation : Nat → Nat → Prop where
+  | total_rel (n m : Nat) : TotalRelation n m
+
+theorem total_relation_is_total : ∀ n m, TotalRelation n m :=
+  fun n m => TotalRelation.total_rel n m
+
+inductive EmptyRelation : Nat → Nat → Prop where
+
+theorem empty_relation_is_empty : ∀ n m, ¬ EmptyRelation n m := by
+  intro n m H
+  cases H
