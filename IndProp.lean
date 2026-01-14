@@ -930,3 +930,134 @@ theorem MStar'' : ∀ T (s : List T) (re : reg_exp T),
               cases hs' with
               | inl h => subst h; exact H1
               | inr h => exact hss'_match s' h⟩
+
+
+
+-- ----------------------- CASE STUDY : IMPROVING REFLECTION ----------------
+
+
+-- Re-prove this locally to avoid namespace/import clashes
+theorem eqb_iff_eq (n m : Nat) : eqb n m = true ↔ n = m := by
+  induction n generalizing m with
+  | zero =>
+    cases m <;> simp [eqb]
+  | succ n' ih =>
+    cases m with
+    | zero => simp [eqb]
+    | succ m' =>
+      simp [eqb]
+      exact ih m'
+
+-- 2. First filter theorem (using Prop-based In)
+theorem filter_not_empty_In (n : Nat) (l : List Nat) :
+  (l.filter (fun x => eqb n x)) ≠ [] → In n l := by
+  induction l with
+  | nil =>
+    intro h
+    contradiction
+  | cons m l' ih =>
+    dsimp [List.filter]
+    cases h : eqb n m
+    · -- case false
+      intro h_neq
+      right
+      apply ih
+      exact h_neq
+    · -- case true
+      intro _
+      rw[eqb_iff_eq] at h
+      rw [h]
+      left
+      rfl
+
+-- 3. The Custom Reflect Type
+inductive Reflect (P : Prop) : Bool → Prop where
+  | ReflectT (h : P) : Reflect P true
+  | ReflectF (h : ¬P) : Reflect P false
+
+theorem iff_reflect (P : Prop) (b : Bool) : (P ↔ b = true) → Reflect P b := by
+  intro h
+  cases b
+  · -- case false
+    apply Reflect.ReflectF
+    -- 'rw [h]'
+    simp [h]
+  · -- case true
+    apply Reflect.ReflectT
+    simp [h]
+
+theorem reflect_iff (P : Prop) (b : Bool) : Reflect P b → (P ↔ b = true) := by
+  intro h
+  cases h with
+  | ReflectT hp =>
+    constructor
+    · intro _; rfl
+    · intro _; exact hp
+  | ReflectF hnp =>
+    constructor
+    · intro hp; contradiction
+    · intro htrue; contradiction
+
+-- 4. Using Reflect for eqb
+theorem eqbP (n m : Nat) : Reflect (n = m) (eqb n m) := by
+  apply iff_reflect
+  rw [eqb_iff_eq]
+
+theorem filter_not_empty_In' (n : Nat) (l : List Nat) :
+  (l.filter (fun x => eqb n x)) ≠ [] → In n l := by
+  induction l with
+  | nil =>
+    intro h
+    contradiction
+  | cons m l' ih =>
+    dsimp [List.filter]
+    cases h : eqb n m
+    · -- Case: eqb n m = false
+      intro h_neq
+      right
+      apply ih
+      exact h_neq
+    · -- Case: eqb n m = true
+      intro _
+      have H := eqbP n m   -- H : Reflect (n=m) (eqb n m)
+      rw [h] at H          -- H : Reflect (n=m) true
+      cases H              -- Now 'cases' works perfectly
+      case ReflectT EQnm => -- EQnm : n = m
+        rw [EQnm]
+        left
+        rfl
+
+-- 5. Counting and Practice
+def count (n : Nat) (l : List Nat) : Nat :=
+  match l with
+  | [] => 0
+  | m :: l' => (if eqb n m then 1 else 0) + count n l'
+
+theorem eqbP_practice (n : Nat) (l : List Nat) :
+  count n l = 0 → ¬(In n l) := by
+  intro h_count
+  induction l with
+  | nil =>
+    intro h_in
+    contradiction
+  | cons m l' ih =>
+    dsimp [count] at h_count
+    -- FIX: Split on the boolean first
+    cases h : eqb n m
+    · -- Case: eqb n m = false
+      -- The 'if' simplifies to 0
+      simp [h] at h_count
+      intro h_in
+      cases h_in with
+      | inl Hhead =>
+        have H := eqbP n m
+        rw [h] at H         -- H : Reflect (n=m) false
+        cases H             -- Unpack it
+        case ReflectF Hneq => -- Hneq : n ≠ m
+          rw [Hhead] at Hneq
+          contradiction
+      | inr Htail =>
+        apply ih
+        exact h_count
+        exact Htail
+    · simp [h] at h_count
