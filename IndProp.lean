@@ -201,9 +201,9 @@ theorem Perm3_refl : forall (X : Type ) (a b c : X),
     . apply Perm3.perm3_swap12
     . apply Perm3.perm3_swap12
 
--- ------------------ ------------------ ------------------ ------------------
+
 -- ------------------ USING EVIDENCE IN PROOFS -----------------------
--- ------------------ ------------------ ------------------ ------------------
+
 
 open Nat
 
@@ -309,9 +309,9 @@ theorem ev_plus_plus : ∀ n m p, ev (n + m) → ev (n + p) → ev (m + p) := by
   · rw [← double_eq_add_self]
     exact ev_double n
 
--- ============================================
--- MULTIPLE INDUCTION HYPOTHESES
--- ============================================
+
+-- ------------------------ MULTIPLE INDUCTION HYPOTHESES -----------------------
+
 
 inductive ev' : Nat → Prop where
   | ev'_0 : ev' 0
@@ -379,9 +379,7 @@ example : ¬ Perm3 [1, 2, 3] [1, 2, 4] := by
   · omega
   · exact h
 
--- ============================================
--- EXERCISING WITH INDUCTIVE RELATIONS
--- ============================================
+-- ---------------------------- EXERCISING WITH INDUCTIVE RELATIONS ----------------------------
 
 namespace Playground
 
@@ -534,8 +532,6 @@ theorem plus_Lt : ∀ n1 n2 m, Lt (n1 + n2) m → Lt n1 m ∧ Lt n2 m := by
       exact n_Le_m__Sn_Le_Sm n2 (n1 + n2) h
     · exact H
 
--- For leb theorems, using Nat.ble from stdlib
-
 theorem leb_complete : ∀ n m, Nat.ble n m = true → Le n m := by
   intro n m
   induction n generalizing m with
@@ -664,3 +660,273 @@ inductive EmptyRelation : Nat → Nat → Prop where
 theorem empty_relation_is_empty : ∀ n m, ¬ EmptyRelation n m := by
   intro n m H
   cases H
+
+
+
+-- ---------------------------- CASE STUDY: REGULAR EXPRESSIONS ----------------------------
+
+-- Regular expression syntax
+inductive reg_exp (T : Type) : Type where
+  | EmptySet : reg_exp T
+  | EmptyStr : reg_exp T
+  | Char : T → reg_exp T
+  | App : reg_exp T → reg_exp T → reg_exp T
+  | Union : reg_exp T → reg_exp T → reg_exp T
+  | Star : reg_exp T → reg_exp T
+
+open reg_exp
+
+-- Matching relation
+inductive exp_match {T : Type} : List T → reg_exp T → Prop where
+  | MEmpty : exp_match [] EmptyStr
+  | MChar (x : T) : exp_match [x] (Char x)
+  | MApp (s1 : List T) (re1 : reg_exp T) (s2 : List T) (re2 : reg_exp T)
+         (H1 : exp_match s1 re1) (H2 : exp_match s2 re2) :
+         exp_match (s1 ++ s2) (App re1 re2)
+  | MUnionL (s1 : List T) (re1 re2 : reg_exp T)
+            (H1 : exp_match s1 re1) :
+            exp_match s1 (Union re1 re2)
+  | MUnionR (s2 : List T) (re1 re2 : reg_exp T)
+            (H2 : exp_match s2 re2) :
+            exp_match s2 (Union re1 re2)
+  | MStar0 (re : reg_exp T) : exp_match [] (Star re)
+  | MStarApp (s1 s2 : List T) (re : reg_exp T)
+             (H1 : exp_match s1 re) (H2 : exp_match s2 (Star re)) :
+             exp_match (s1 ++ s2) (Star re)
+
+-- Notation (can't use =~ easily in Lean, using infix)
+infix:50 " =~ " => exp_match
+
+open exp_match
+
+-- Examples
+example : [1] =~ Char 1 := MChar 1
+
+example : [1, 2] =~ App (Char 1) (Char 2) := by
+  have h : [1, 2] = [1] ++ [2] := rfl
+  rw [h]
+  exact MApp [1] (Char 1) [2] (Char 2) (MChar 1) (MChar 2)
+
+theorem Char_match : ∀ {T} {s : List T} {x: T}, s =~ Char x → s = [x] := by
+  intro T s x H
+  cases H
+  rfl
+
+example : ¬([1, 2] =~ Char 1) := by
+  intro H
+  have h := Char_match H
+  simp at h
+
+-- Convert list to regex that matches exactly that list
+def reg_exp_of_list {T : Type} (l : List T) : reg_exp T :=
+  match l with
+  | [] => EmptyStr
+  | x :: l' => App (Char x) (reg_exp_of_list l')
+
+example : [1, 2, 3] =~ reg_exp_of_list [1, 2, 3] := by
+  simp [reg_exp_of_list]
+  have h1 : [1, 2, 3] = [1] ++ [2, 3] := rfl
+  rw [h1]
+  apply MApp
+  · exact MChar 1
+  · have h2 : [2, 3] = [2] ++ [3] := rfl
+    rw [h2]
+    apply MApp
+    · exact MChar 2
+    · have h3 : [3] = [3] ++ [] := rfl
+      rw [h3]
+      apply MApp
+      · exact MChar 3
+      · exact MEmpty
+
+theorem MStar1 : ∀ T (s : List T) (re : reg_exp T),
+    s =~ re → s =~ Star re := by
+  intro T s re H
+  have h : s = s ++ [] := by simp
+  rw [h]
+  exact MStarApp s [] re H (MStar0 re)
+
+theorem EmptySet_is_empty : ∀ T (s : List T), ¬(s =~ EmptySet) := by
+  intro T s H
+  cases H
+
+theorem MUnion' : ∀ T (s : List T) (re1 re2 : reg_exp T),
+    s =~ re1 ∨ s =~ re2 → s =~ Union re1 re2 := by
+  intro T s re1 re2 H
+  cases H with
+  | inl h => exact MUnionL s re1 re2 h
+  | inr h => exact MUnionR s re1 re2 h
+
+-- fold for lists
+def fold {X Y : Type} (f : X → Y → Y) (l : List X) (b : Y) : Y :=
+  match l with
+  | [] => b
+  | h :: t => f h (fold f t b)
+
+theorem MStar' : ∀ T (ss : List (List T)) (re : reg_exp T),
+    (∀ s, In s ss → s =~ re) →
+    fold (· ++ ·) ss [] =~ Star re := by
+  intro T ss re H
+  induction ss with
+  | nil => simp [fold]; exact MStar0 re
+  | cons s1 ss' ih =>
+    simp [fold]
+    apply MStarApp
+    · apply H; simp [In]
+    · apply ih; intro s hs; apply H; simp [In]; right; exact hs
+
+def EmptyStr' {T : Type} : reg_exp T := Star EmptySet
+
+-- Helper for EmptyStr
+theorem EmptyStr_match : ∀ {T} {s : List T}, s =~ EmptyStr → s = [] := by
+  intro T s H
+  cases H
+  rfl
+
+-- Characters in a regex
+def re_chars {T : Type} (re : reg_exp T) : List T :=
+  match re with
+  | EmptySet => []
+  | EmptyStr => []
+  | reg_exp.Char x => [x]
+  | App re1 re2 => re_chars re1 ++ re_chars re2
+  | reg_exp.Union re1 re2 => re_chars re1 ++ re_chars re2
+  | Star re => re_chars re
+
+theorem in_re_match : ∀ T (s : List T) (re : reg_exp T) (x : T),
+    s =~ re → In x s → In x (re_chars re) := by
+  intro T s re x HMatch HIn
+  induction HMatch with
+  | MEmpty => simp [In] at HIn
+  | MChar x' => simp [re_chars]; exact HIn
+  | MApp s1 re1 s2 re2 _ _ ih1 ih2 =>
+    simp [re_chars]
+    rw [In_app_iff] at HIn
+    rw [In_app_iff]
+    cases HIn with
+    | inl h => left; exact ih1 h
+    | inr h => right; exact ih2 h
+  | MUnionL s1 re1 re2 _ ih =>
+    simp [re_chars]
+    rw [In_app_iff]
+    left; exact ih HIn
+  | MUnionR s2 re1 re2 _ ih =>
+    simp [re_chars]
+    rw [In_app_iff]
+    right; exact ih HIn
+  | MStar0 _ => simp [In] at HIn
+  | MStarApp s1 s2 re _ _ ih1 ih2 =>
+    simp [re_chars]
+    rw [In_app_iff] at HIn
+    cases HIn with
+    | inl h => exact ih1 h
+    | inr h => exact ih2 h
+
+-- Check if regex can match some string
+def re_not_empty {T : Type} (re : reg_exp T) : Bool :=
+  match re with
+  | EmptySet => false
+  | EmptyStr => true
+  | reg_exp.Char _ => true
+  | App re1 re2 => re_not_empty re1 && re_not_empty re2
+  | reg_exp.Union re1 re2 => re_not_empty re1 || re_not_empty re2
+  | Star _ => true
+
+theorem re_not_empty_correct : ∀ T (re : reg_exp T),
+    (∃ s, s =~ re) ↔ re_not_empty re = true := by
+  intro T re
+  constructor
+  · intro ⟨s, HMatch⟩
+    induction HMatch with
+    | MEmpty => rfl
+    | MChar _ => rfl
+    | MApp _ _ _ _ _ _ ih1 ih2 =>
+      simp [re_not_empty]; constructor; exact ih1; exact ih2
+    | MUnionL _ _ _ _ ih => simp [re_not_empty]; left; exact ih
+    | MUnionR _ _ _ _ ih => simp [re_not_empty]; right; exact ih
+    | MStar0 _ => rfl
+    | MStarApp _ _ _ _ _ _ _ => rfl
+  · intro H
+    induction re with
+    | EmptySet => simp [re_not_empty] at H
+    | EmptyStr => exact ⟨[], MEmpty⟩
+    | Char t => exact ⟨[t], MChar t⟩
+    | App re1 re2 ih1 ih2 =>
+      simp [re_not_empty] at H
+      obtain ⟨h1, h2⟩ := H
+      obtain ⟨s1, hs1⟩ := ih1 h1
+      obtain ⟨s2, hs2⟩ := ih2 h2
+      exact ⟨s1 ++ s2, MApp s1 re1 s2 re2 hs1 hs2⟩
+    | Union re1 re2 ih1 ih2 =>
+      simp [re_not_empty] at H
+      cases H with
+      | inl h =>
+        obtain ⟨s1, hs1⟩ := ih1 h
+        exact ⟨s1, MUnionL s1 re1 re2 hs1⟩
+      | inr h =>
+        obtain ⟨s2, hs2⟩ := ih2 h
+        exact ⟨s2, MUnionR s2 re1 re2 hs2⟩
+    | Star _ _ => exact ⟨[], MStar0 _⟩
+
+-- star_app: Key lemma requiring "remember" pattern
+-- lean doesn't have remember tactic
+-- In Lean, we use `generalize` or carry the equality through manually
+
+-- star_app with explicit equality argument (avoids generalize issues)
+theorem star_app_aux : ∀ T (s1 s2 : List T) (re re' : reg_exp T),
+    re' = Star re →
+    s1 =~ re' →
+    s2 =~ Star re →
+    s1 ++ s2 =~ Star re := by
+  intro T s1 s2 re re' heq H1 H2
+  induction H1 generalizing re with
+  | MEmpty => simp at heq
+  | MChar _ => simp  at heq
+  | MApp _ _ _ _ _ _ _ _ => simp at heq
+  | MUnionL _ _ _ _ _ => simp at heq
+  | MUnionR _ _ _ _ _ => simp  at heq
+  | MStar0 re'' =>
+    simp at heq
+    subst heq
+    simp
+    exact H2
+  | MStarApp s1' s2' re'' _ _ _ ih2 =>
+    simp at heq
+    subst heq
+    rw [List.append_assoc]
+    apply MStarApp
+    · assumption
+    · exact ih2 _ rfl H2
+
+theorem star_app : ∀ T (s1 s2 : List T) (re : reg_exp T),
+    s1 =~ Star re →
+    s2 =~ Star re →
+    s1 ++ s2 =~ Star re := by
+  intro T s1 s2 re H1 H2
+  exact star_app_aux T s1 s2 re (Star re) rfl H1 H2
+
+theorem MStar'' : ∀ T (s : List T) (re : reg_exp T),
+    s =~ Star re →
+    ∃ ss : List (List T),
+      s = fold (· ++ ·) ss [] ∧ ∀ s', In s' ss → s' =~ re := by
+  intro T s re HMatch
+  generalize hre : Star re = re' at HMatch
+  induction HMatch with
+  | MEmpty => injection hre
+  | MChar _ => injection hre
+  | MApp _ _ _ _ _ _ _ _ => injection hre
+  | MUnionL _ _ _ _ _ => injection hre
+  | MUnionR _ _ _ _ _ => injection hre
+  | MStar0 _ =>
+    exact ⟨[], by simp [fold], by intro s' h; simp [In] at h⟩
+  | MStarApp s1 s2 re' H1 _ _ ih2 =>
+    injection hre with hre'
+    subst hre'
+    obtain ⟨ss', hss'_eq, hss'_match⟩ := ih2 rfl
+    exact ⟨s1 :: ss',
+           by simp [fold]; rw [hss'_eq],
+           by intro s' hs'
+              simp [In] at hs'
+              cases hs' with
+              | inl h => subst h; exact H1
+              | inr h => exact hss'_match s' h⟩
