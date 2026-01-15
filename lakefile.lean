@@ -27,3 +27,11 @@ lean_lib «Tactics» where
 @[default_target]
 lean_lib «Logic» where
   srcDir := "."
+
+@[default_target]
+lean_lib «IndProp» where
+  srcDir := "."
+
+@[default_target]
+lean_lib «Maps» where
+  srcDir := "."
