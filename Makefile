@@ -1,6 +1,6 @@
 COQMFFLAGS := -Q . LF  
 
-ALLVFILES := Basics.v Induction.v Lists.v Poly.v Tactics.v Logic.v IndProp.v
+ALLVFILES := Basics.v Induction.v Lists.v Poly.v Tactics.v Logic.v IndProp.v Maps.v
 
 build: Makefile.coq
 	$(MAKE) -f Makefile.coq
