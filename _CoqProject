@@ -5,3 +5,4 @@ Lists.v
 Poly.v
 Tactics.v
 Logic.v
+IndProp.v
