@@ -35,3 +35,7 @@ lean_lib «IndProp» where
 @[default_target]
 lean_lib «Maps» where
   srcDir := "."
+
+@[default_target]
+lean_lib «ProofObjects» where
+  srcDir := "."
