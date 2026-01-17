@@ -1,7 +1,4 @@
-/-
-  ProofObjects: The Curry-Howard Correspondence
--/
-
+-- ProofObjects: The Curry-Howard Correspondence
 
 inductive ev : Nat -> Prop where
   | ev_0 : ev 0
@@ -18,23 +15,18 @@ theorem ev_4 : ev 4 := by
   apply ev_SS
   apply ev_0
 
-
 #print ev_4
-
 
 #check (ev_SS 2 (ev_SS 0 ev_0) : ev 4)
 
-
 theorem ev_4' : ev 4 := by
   exact ev_SS 2 (ev_SS 0 ev_0)
-
 
 theorem ev_4'' : ev 4 := by
   apply ev_SS  -- Coq Show Proof: (ev_SS ?n ?H)
   apply ev_SS  -- Coq Show Proof: (ev_SS _ (ev_SS ?n ?H))
   apply ev_0   -- Coq Show Proof: (ev_SS 2 (ev_SS 0 ev_0))
 
-/-- Term-mode proof: no tactics, just construct the evidence directly. -/
 def ev_4''' : ev 4 := ev_SS 2 (ev_SS 0 ev_0)
 
 #print ev_4
@@ -42,11 +34,9 @@ def ev_4''' : ev 4 := ev_SS 2 (ev_SS 0 ev_0)
 #print ev_4''
 #print ev_4'''
 
-/-- ev 8: proof using tactic -/
 theorem ev_8 : ev 8 := by
   exact ev_SS 6 (ev_SS 4 (ev_SS 2 (ev_SS 0 ev_0)))
 
-/-- ev 8: term-mode proof -/
 def ev_8' : ev 8 := ev_SS 6 (ev_SS 4 (ev_SS 2 (ev_SS 0 ev_0)))
 
 #print ev_8
@@ -58,12 +48,10 @@ theorem ev_plus4 : ∀ n, ev n → ev (n + 4) := by
   apply ev_SS
   exact H
 
-
 def ev_plus4' : ∀ n, ev n → ev (n + 4) :=
   fun (n : Nat) => fun (H : ev n) =>
     ev_SS (n + 2) (ev_SS n H)
 
-/-- Alternative: arguments before the colon. -/
 def ev_plus4'' (n : Nat) (H : ev n) : ev (n + 4) :=
   ev_SS (n + 2) (ev_SS n H)
 
@@ -88,27 +76,15 @@ def add1 : Nat → Nat := by
 
 -- ------------------ LOGICAL CONNECTIVES AS INDUCTIVE TYPES -----------------------
 
--- Coq defines And, Or, Ex, True, False as inductive types.
--- Lean has these built-in with the same structure:
---
---   Coq                    Lean
---   conj HP HQ             And.intro hp hq  or  ⟨hp, hq⟩
---   or_introl HP           Or.inl hp
---   or_intror HQ           Or.inr hq
---   ex_intro P x Hx        Exists.intro x hx  or  ⟨x, hx⟩
---   I                      True.intro  or  trivial
---   match contra with end  False.elim contra  or  nomatch contra
 
 -- ------------------ CONJUNCTION -----------------------
 
 #print And
 
--- Projection: extract left component (tactic)
 theorem proj1' (P Q : Prop) (HPQ : P ∧ Q) : P := by
   obtain ⟨HP, _⟩ := HPQ
   exact HP
 
--- And is commutative (tactic)
 theorem and_comm' (P Q : Prop) : P ∧ Q ↔ Q ∧ P := by
   constructor
   · intro ⟨HP, HQ⟩
@@ -116,24 +92,19 @@ theorem and_comm' (P Q : Prop) : P ∧ Q ↔ Q ∧ P := by
   · intro ⟨HQ, HP⟩
     exact ⟨HP, HQ⟩
 
--- Projection: term-mode with pattern matching
 def proj1'' (P Q : Prop) (HPQ : P ∧ Q) : P :=
   match HPQ with
   | ⟨HP, _⟩ => HP
 
--- Or use .left accessor directly
 def proj1''' (P Q : Prop) (HPQ : P ∧ Q) : P := HPQ.left
 
--- Auxiliary for and_comm (term-mode)
 def and_comm'_aux (P Q : Prop) (H : P ∧ Q) : Q ∧ P :=
   match H with
   | ⟨HP, HQ⟩ => ⟨HQ, HP⟩
 
--- And commutativity (term-mode)
 def and_comm'' (P Q : Prop) : P ∧ Q ↔ Q ∧ P :=
   ⟨and_comm'_aux P Q, and_comm'_aux Q P⟩
 
--- conj_fact: P ∧ Q → Q ∧ R → P ∧ R
 def conj_fact (P Q R : Prop) (HPQ : P ∧ Q) (HQR : Q ∧ R) : P ∧ R :=
   match HPQ, HQR with
   | ⟨HP, _⟩, ⟨_, HR⟩ => ⟨HP, HR⟩
@@ -142,33 +113,27 @@ def conj_fact (P Q R : Prop) (HPQ : P ∧ Q) (HQR : Q ∧ R) : P ∧ R :=
 
 #print Or
 
--- Left injection (term-mode)
 def inj_l (P Q : Prop) (HP : P) : P ∨ Q := Or.inl HP
 
--- Left injection (tactic)
 theorem inj_l' (P Q : Prop) (HP : P) : P ∨ Q := by
   left
   exact HP
 
--- Or elimination (term-mode)
 def or_elim (P Q R : Prop) (HPQ : P ∨ Q) (HPR : P → R) (HQR : Q → R) : R :=
   match HPQ with
   | Or.inl HP => HPR HP
   | Or.inr HQ => HQR HQ
 
--- Or elimination (tactic)
 theorem or_elim' (P Q R : Prop) (HPQ : P ∨ Q) (HPR : P → R) (HQR : Q → R) : R := by
   cases HPQ with
   | inl HP => exact HPR HP
   | inr HQ => exact HQR HQ
 
--- Or commutativity (tactic)
 theorem or_commut (P Q : Prop) (HPQ : P ∨ Q) : Q ∨ P := by
   cases HPQ with
   | inl HP => right; exact HP
   | inr HQ => left; exact HQ
 
--- Or commutativity (term-mode)
 def or_commut' (P Q : Prop) (HPQ : P ∨ Q) : Q ∨ P :=
   match HPQ with
   | Or.inl HP => Or.inr HP
@@ -180,15 +145,12 @@ def or_commut' (P Q : Prop) (HPQ : P ∨ Q) : Q ∨ P :=
 
 #check (⟨4, ev_SS 2 (ev_SS 0 ev_0)⟩ : ∃ n, ev n)
 
--- Some natural is even: witness is 4
 def some_nat_is_even : ∃ n, ev n :=
   ⟨4, ev_SS 2 (ev_SS 0 ev_0)⟩
 
--- There exists n such that n+1 is even: witness is 1
 def ex_ev_Sn : ∃ n, ev (n + 1) :=
   ⟨1, ev_SS 0 ev_0⟩
 
--- Distribute exists over or
 def dist_exists_or (X : Type) (P Q : X → Prop)
     (H : ∃ x, P x ∨ Q x) : (∃ x, P x) ∨ (∃ x, Q x) :=
   match H with
@@ -197,7 +159,6 @@ def dist_exists_or (X : Type) (P Q : X → Prop)
     | Or.inl HPx => Or.inl ⟨x, HPx⟩
     | Or.inr HQx => Or.inr ⟨x, HQx⟩
 
--- Map over existential
 def ex_map (A : Type) (P Q : A → Prop)
     (H : ∀ x, P x → Q x) (HP : ∃ x, P x) : ∃ x, Q x :=
   match HP with
@@ -208,17 +169,68 @@ def ex_map (A : Type) (P Q : A → Prop)
 #print True
 #print False
 
--- Anything implies True
 def p_implies_true (P : Prop) (_ : P) : True := True.intro
 
--- From False, anything follows (nomatch)
 def false_implies_zero_eq_one : False → 0 = 1 :=
   fun contra => nomatch contra
 
--- Ex falso quodlibet (nomatch)
 def ex_falso_quodlibet' (P : Prop) (contra : False) : P :=
   nomatch contra
 
--- Alternative: use False.elim
 def ex_falso_quodlibet'' (P : Prop) (contra : False) : P :=
   False.elim contra
+
+-- ------------------ EQUALITY -----------------------
+
+#print Eq
+
+theorem four : 2 + 2 = 1 + 3 := by
+  rfl
+
+def four' : 2 + 2 = 1 + 3 := Eq.refl 4
+
+def four'' : 2 + 2 = 1 + 3 := rfl
+
+def singleton (X : Type) (x : X) : [] ++ [x] = x :: [] := rfl
+
+def eq_add (n1 n2 : Nat) (Heq : n1 = n2) : n1 + 1 = n2 + 1 :=
+  match Heq with
+  | rfl => rfl
+
+theorem eq_add' (n1 n2 : Nat) (Heq : n1 = n2) : n1 + 1 = n2 + 1 := by
+  cases Heq
+  rfl
+
+def eq_cons (X : Type) (h1 h2 : X) (t1 t2 : List X)
+    (Heq : h1 = h2) (Teq : t1 = t2) : h1 :: t1 = h2 :: t2 :=
+  match Heq, Teq with
+  | rfl, rfl => rfl
+
+theorem equality_leibniz_equality (X : Type) (x y : X)
+    (H : x = y) (P : X → Prop) (Hx : P x) : P y := by
+  cases H
+  exact Hx
+
+def equality_leibniz_equality_term (X : Type) (x y : X)
+    (Heq : x = y) : ∀ P : X → Prop, P x → P y :=
+  match Heq with
+  | rfl => fun _ H => H
+
+theorem leibniz_equality_equality (X : Type) (x y : X)
+    (H : ∀ P : X → Prop, P x → P y) : x = y :=
+  H (fun z => x = z) rfl
+
+
+-- ------------------ TRUSTED COMPUTING BASE -----------------------
+
+-- This would fail: non-exhaustive match
+-- def or_bogus (P Q : Prop) (A : P ∨ Q) : P :=
+--   match A with
+--   | Or.inl H => H
+--   -- missing Or.inr case!
+
+-- This would fail: non-terminating
+-- def infinite_loop (X : Type) (n : Nat) : X :=
+--   infinite_loop X n
+--
+-- def falso : False := infinite_loop False 0
