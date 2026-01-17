@@ -234,3 +234,71 @@ theorem leibniz_equality_equality (X : Type) (x y : X)
 --   infinite_loop X n
 --
 -- def falso : False := infinite_loop False 0
+
+-- ------------------ MORE EXERCISES -----------------------
+
+def and_assoc' (P Q R : Prop) (H : P ∧ (Q ∧ R)) : (P ∧ Q) ∧ R :=
+  match H with
+  | ⟨HP, ⟨HQ, HR⟩⟩ => ⟨⟨HP, HQ⟩, HR⟩
+
+def or_distributes_over_and (P Q R : Prop) : P ∨ (Q ∧ R) ↔ (P ∨ Q) ∧ (P ∨ R) :=
+  ⟨fun H =>
+    match H with
+    | Or.inl HP => ⟨Or.inl HP, Or.inl HP⟩
+    | Or.inr ⟨HQ, HR⟩ => ⟨Or.inr HQ, Or.inr HR⟩,
+   fun H =>
+    match H with
+    | ⟨Or.inl HP, _⟩ => Or.inl HP
+    | ⟨_, Or.inl HP⟩ => Or.inl HP
+    | ⟨Or.inr HQ, Or.inr HR⟩ => Or.inr ⟨HQ, HR⟩⟩
+
+def double_neg (P : Prop) (H : P) : ¬¬P :=
+  fun HnotP => HnotP H
+
+def contradiction_implies_anything (P Q : Prop) (contra : P ∧ ¬P) : Q :=
+  match contra with
+  | ⟨HP, HNA⟩ => nomatch HNA HP
+
+def de_morgan_not_or (P Q : Prop) (HPQ : ¬(P ∨ Q)) : ¬P ∧ ¬Q :=
+  ⟨fun HP => HPQ (Or.inl HP), fun HQ => HPQ (Or.inr HQ)⟩
+
+def curry' (P Q R : Prop) (Hpair : P ∧ Q → R) (HP : P) (HQ : Q) : R :=
+  Hpair ⟨HP, HQ⟩
+
+def uncurry' (P Q R : Prop) (f : P → Q → R) (HPQ : P ∧ Q) : R :=
+  match HPQ with
+  | ⟨HP, HQ⟩ => f HP HQ
+
+-- ------------------ PROOF IRRELEVANCE (ADVANCED) -----------------------
+
+def propositional_extensionality : Prop :=
+  ∀ (P Q : Prop), (P ↔ Q) → P = Q
+
+theorem pe_implies_or_eq (PE : propositional_extensionality)
+    (P Q : Prop) : (P ∨ Q) = (Q ∨ P) := by
+  apply PE
+  constructor
+  · exact or_commut P Q
+  · exact or_commut Q P
+
+theorem pe_implies_true_eq (PE : propositional_extensionality)
+    (P : Prop) (HP : P) : True = P := by
+  apply PE
+  constructor
+  · intro _; exact HP
+  · intro _; exact True.intro
+
+def proof_irrelevance : Prop :=
+  ∀ (P : Prop) (pf1 pf2 : P), pf1 = pf2
+
+theorem pe_implies_pi (PE : propositional_extensionality) : proof_irrelevance := by
+  intro P pf1 pf2
+  have H : P = True := by
+    apply PE
+    constructor
+    · intro _; exact True.intro
+    · intro _; exact pf1
+  subst H
+  cases pf1
+  cases pf2
+  rfl
