@@ -416,3 +416,62 @@ example : aeval' (tUpdate (tUpdate empty_st Y 4) X 5)
 -- beval (X !-> 5) <{ true && ~(X <= 4) }> = true
 example : beval' (tUpdate empty_st X 5)
                 (BAnd BTrue (BNot (BLe (AId X) (ANum 4)))) = true := rfl
+
+-- ------------------ COMMANDS -----------------------
+
+inductive Com : Type where
+  | CSkip
+  | CAsgn (x : String) (a : AExp')
+  | CSeq (c1 c2 : Com)
+  | CIf (b : BExp') (c1 c2 : Com)
+  | CWhile (b : BExp') (c : Com)
+
+open Com
+
+-- Coq uses custom notation <{ skip }>, <{ X := 3 }>, etc.
+-- We use explicit constructors.
+
+-- Factorial program:
+--   Z := X;
+--   Y := 1;
+--   while Z <> 0 do
+--     Y := Y * Z;
+--     Z := Z - 1
+--   end
+def fact_in_lean : Com :=
+  CSeq (CAsgn Z (AId X))
+    (CSeq (CAsgn Y (ANum 1))
+      (CWhile (BNeq (AId Z) (ANum 0))
+        (CSeq (CAsgn Y (AMult (AId Y) (AId Z)))
+              (CAsgn Z (AMinus (AId Z) (ANum 1))))))
+
+-- ------------------ MORE EXAMPLES -----------------------
+
+-- Assignment: X := X + 2
+def plus2 : Com :=
+  CAsgn X (APlus (AId X) (ANum 2))
+
+-- Z := X * Y
+def XtimesYinZ : Com :=
+  CAsgn Z (AMult (AId X) (AId Y))
+
+-- Loops
+
+-- Z := Z - 1; X := X - 1
+def subtract_slowly_body : Com :=
+  CSeq (CAsgn Z (AMinus (AId Z) (ANum 1)))
+       (CAsgn X (AMinus (AId X) (ANum 1)))
+
+-- while X <> 0 do subtract_slowly_body end
+def subtract_slowly : Com :=
+  CWhile (BNeq (AId X) (ANum 0)) subtract_slowly_body
+
+-- X := 3; Z := 5; subtract_slowly
+def subtract_3_from_5_slowly : Com :=
+  CSeq (CAsgn X (ANum 3))
+    (CSeq (CAsgn Z (ANum 5))
+          subtract_slowly)
+
+-- Infinite loop: while true do skip end
+def loop : Com :=
+  CWhile BTrue CSkip
