@@ -1,3 +1,4 @@
+import Maps
 -- ------------------ ARITHMETIC AND BOOLEAN EXPRESSIONS -----------------------
 
 -- Arithmetic expressions
@@ -334,3 +335,84 @@ inductive AEvalR'' : AExp'' → Nat → Prop where
 -- AAny can evaluate to any natural number - nondeterministic
 
 end AEvalR_Extended
+
+-- ------------------ EXPRESSIONS WITH VARIABLES -----------------------
+
+-- State maps variable names (strings) to values (nats)
+def State := TotalMap Nat
+
+-- Redefine AExp with variables
+inductive AExp' : Type where
+  | ANum (n : Nat)
+  | AId (x : String)       -- NEW: variable lookup
+  | APlus (a1 a2 : AExp')
+  | AMinus (a1 a2 : AExp')
+  | AMult (a1 a2 : AExp')
+
+-- Common variable names
+def W : String := "W"
+def X : String := "X"
+def Y : String := "Y"
+def Z : String := "Z"
+
+-- Redefine BExp (same structure, but uses new AExp)
+inductive BExp' : Type where
+  | BTrue
+  | BFalse
+  | BEq (a1 a2 : AExp')
+  | BNeq (a1 a2 : AExp')
+  | BLe (a1 a2 : AExp')
+  | BGt (a1 a2 : AExp')
+  | BNot (b : BExp')
+  | BAnd (b1 b2 : BExp')
+
+open AExp' BExp'
+
+-- Coq uses custom notation <{ 3 + (X * 2) }>
+-- We use explicit constructors: APlus (ANum 3) (AMult (AId X) (ANum 2))
+
+def example_aexp : AExp' := APlus (ANum 3) (APlus (AId X) (ANum 2))
+def example_bexp : BExp' := BAnd BTrue (BNot (BLe (AId X) (ANum 4)))
+
+-- ------------------ EVALUATION WITH STATE -----------------------
+
+-- aeval now takes a state to look up variables
+def aeval' (st : State) (a : AExp') : Nat :=
+  match a with
+  | AExp'.ANum n => n
+  | AExp'.AId x => st x                           -- look up variable in state
+  | AExp'.APlus a1 a2 => aeval' st a1 + aeval' st a2
+  | AExp'.AMinus a1 a2 => aeval' st a1 - aeval' st a2
+  | AExp'.AMult a1 a2 => aeval' st a1 * aeval' st a2
+
+-- beval now takes a state
+def beval' (st : State) (b : BExp') : Bool :=
+  match b with
+  | BExp'.BTrue => true
+  | BExp'.BFalse => false
+  | BExp'.BEq a1 a2 => aeval' st a1 == aeval' st a2
+  | BExp'.BNeq a1 a2 => !(aeval' st a1 == aeval' st a2)
+  | BExp'.BLe a1 a2 => decide (aeval' st a1 ≤ aeval' st a2)
+  | BExp'.BGt a1 a2 => !(decide (aeval' st a1 ≤ aeval' st a2))
+  | BExp'.BNot b1 => !beval' st b1
+  | BExp'.BAnd b1 b2 => beval' st b1 && beval' st b2
+
+-- Empty state: all variables map to 0
+def empty_st : State := tEmpty 0
+
+-- Notation for single binding: X !-> 5 means update empty_st with X -> 5
+-- We use tUpdate directly
+-- Coq: (X !-> 5) means (X !-> 5 ; empty_st)
+
+-- Examples
+-- aeval (X !-> 5) <{ 3 + (X * 2) }> = 13
+example : aeval' (tUpdate empty_st X 5) (APlus (ANum 3) (AMult (AId X) (ANum 2))) = 13 := rfl
+
+-- aeval (X !-> 5 ; Y !-> 4) <{ Z + (X * Y) }> = 20
+-- Z is not bound, so Z -> 0
+example : aeval' (tUpdate (tUpdate empty_st Y 4) X 5)
+                (APlus (AId Z) (AMult (AId X) (AId Y))) = 20 := rfl
+
+-- beval (X !-> 5) <{ true && ~(X <= 4) }> = true
+example : beval' (tUpdate empty_st X 5)
+                (BAnd BTrue (BNot (BLe (AId X) (ANum 4)))) = true := rfl
