@@ -176,3 +176,161 @@ example (m n : Nat) : m + n = n + m := by
 
 example (m n p : Nat) : m + (n + p) = m + n + p := by
   omega
+
+-- ------------------ EVALUATION AS A RELATION -----------------------
+
+-- Instead of a function aeval : AExp → Nat, define a relation
+-- aevalR : AExp → Nat → Prop
+
+inductive AEvalR : AExp → Nat → Prop where
+  | E_ANum (n : Nat) : AEvalR (ANum n) n
+  | E_APlus (e1 e2 : AExp) (n1 n2 : Nat) :
+      AEvalR e1 n1 → AEvalR e2 n2 → AEvalR (APlus e1 e2) (n1 + n2)
+  | E_AMinus (e1 e2 : AExp) (n1 n2 : Nat) :
+      AEvalR e1 n1 → AEvalR e2 n2 → AEvalR (AMinus e1 e2) (n1 - n2)
+  | E_AMult (e1 e2 : AExp) (n1 n2 : Nat) :
+      AEvalR e1 n1 → AEvalR e2 n2 → AEvalR (AMult e1 e2) (n1 * n2)
+
+-- Notation: Coq uses `e ==> n`, we use infix
+infix:50 " ==> " => AEvalR
+
+-- ------------------ EQUIVALENCE OF DEFINITIONS -----------------------
+
+theorem aevalR_iff_aeval (a : AExp) (n : Nat) : (a ==> n) ↔ aeval a = n := by
+  constructor
+  -- → direction: relation implies function
+  · intro H
+    induction H with
+    | E_ANum n => rfl
+    | E_APlus _ _ _ _ _ _ IH1 IH2 => simp [aeval, IH1, IH2]
+    | E_AMinus _ _ _ _ _ _ IH1 IH2 => simp [aeval, IH1, IH2]
+    | E_AMult _ _ _ _ _ _ IH1 IH2 => simp [aeval, IH1, IH2]
+  -- ← direction: function implies relation
+  · intro H
+    induction a generalizing n with
+    | ANum m => simp [aeval] at H; subst H; exact AEvalR.E_ANum m
+    | APlus a1 a2 IH1 IH2 =>
+      simp [aeval] at H; subst H
+      exact AEvalR.E_APlus a1 a2 _ _ (IH1 _ rfl) (IH2 _ rfl)
+    | AMinus a1 a2 IH1 IH2 =>
+      simp [aeval] at H; subst H
+      exact AEvalR.E_AMinus a1 a2 _ _ (IH1 _ rfl) (IH2 _ rfl)
+    | AMult a1 a2 IH1 IH2 =>
+      simp [aeval] at H; subst H
+      exact AEvalR.E_AMult a1 a2 _ _ (IH1 _ rfl) (IH2 _ rfl)
+
+-- ------------------ BOOLEAN EVALUATION RELATION -----------------------
+
+inductive BEvalR : BExp → Bool → Prop where
+  | E_BTrue : BEvalR BTrue true
+  | E_BFalse : BEvalR BFalse false
+  | E_BEq (e1 e2 : AExp) (n1 n2 : Nat) :
+      AEvalR e1 n1 → AEvalR e2 n2 → BEvalR (BEq e1 e2) (n1 == n2)
+  | E_BNeq (e1 e2 : AExp) (n1 n2 : Nat) :
+      AEvalR e1 n1 → AEvalR e2 n2 → BEvalR (BNeq e1 e2) (!(n1 == n2))
+  | E_BLe (e1 e2 : AExp) (n1 n2 : Nat) :
+      AEvalR e1 n1 → AEvalR e2 n2 → BEvalR (BLe e1 e2) (decide (n1 ≤ n2))
+  | E_BGt (e1 e2 : AExp) (n1 n2 : Nat) :
+      AEvalR e1 n1 → AEvalR e2 n2 → BEvalR (BGt e1 e2) (!(decide (n1 ≤ n2)))
+  | E_BNot (e : BExp) (b : Bool) :
+      BEvalR e b → BEvalR (BNot e) (!b)
+  | E_BAnd (e1 e2 : BExp) (b1 b2 : Bool) :
+      BEvalR e1 b1 → BEvalR e2 b2 → BEvalR (BAnd e1 e2) (b1 && b2)
+
+infix:50 " ==>b " => BEvalR
+
+theorem bevalR_iff_beval (b : BExp) (bv : Bool) : (b ==>b bv) ↔ beval b = bv := by
+  constructor
+  · intro H
+    induction H with
+    | E_BTrue => rfl
+    | E_BFalse => rfl
+    | E_BEq _ _ n1 n2 H1 H2 =>
+      simp [beval, (aevalR_iff_aeval _ _).mp H1, (aevalR_iff_aeval _ _).mp H2]
+    | E_BNeq _ _ n1 n2 H1 H2 =>
+      simp [beval, (aevalR_iff_aeval _ _).mp H1, (aevalR_iff_aeval _ _).mp H2]
+    | E_BLe _ _ n1 n2 H1 H2 =>
+      simp [beval, (aevalR_iff_aeval _ _).mp H1, (aevalR_iff_aeval _ _).mp H2]
+    | E_BGt _ _ n1 n2 H1 H2 =>
+      simp [beval, (aevalR_iff_aeval _ _).mp H1, (aevalR_iff_aeval _ _).mp H2]
+    | E_BNot _ _ _ IH => simp [beval, IH]
+    | E_BAnd _ _ _ _ _ _ IH1 IH2 => simp [beval, IH1, IH2]
+  · intro H
+    induction b generalizing bv with
+    | BTrue => simp [beval] at H; subst H; exact BEvalR.E_BTrue
+    | BFalse => simp [beval] at H; subst H; exact BEvalR.E_BFalse
+    | BEq a1 a2 =>
+      simp [beval] at H; subst H
+      exact BEvalR.E_BEq a1 a2 _ _ ((aevalR_iff_aeval _ _).mpr rfl) ((aevalR_iff_aeval _ _).mpr rfl)
+    | BNeq a1 a2 =>
+      rw [← H]
+      exact BEvalR.E_BNeq a1 a2 _ _ ((aevalR_iff_aeval _ _).mpr rfl) ((aevalR_iff_aeval _ _).mpr rfl)
+    | BLe a1 a2 =>
+      simp [beval] at H; rw [← H]
+      exact BEvalR.E_BLe a1 a2 _ _ ((aevalR_iff_aeval _ _).mpr rfl) ((aevalR_iff_aeval _ _).mpr rfl)
+    | BGt a1 a2 =>
+      rw [← H]
+      exact BEvalR.E_BGt a1 a2 _ _ ((aevalR_iff_aeval _ _).mpr rfl) ((aevalR_iff_aeval _ _).mpr rfl)
+    | BNot b1 IH =>
+      rw [← H]
+      exact BEvalR.E_BNot b1 _ (IH _ rfl)
+    | BAnd b1 b2 IH1 IH2 =>
+      simp [beval] at H; subst H
+      exact BEvalR.E_BAnd b1 b2 _ _ (IH1 _ rfl) (IH2 _ rfl)
+
+-- ------------------ COMPUTATIONAL VS RELATIONAL DEFINITIONS -----------------------
+
+-- Example: Adding division - hard with functions (what is 5/0?), easy with relations
+
+namespace AEvalR_Division
+
+inductive AExp' : Type where
+  | ANum (n : Nat)
+  | APlus (a1 a2 : AExp')
+  | AMinus (a1 a2 : AExp')
+  | AMult (a1 a2 : AExp')
+  | ADiv (a1 a2 : AExp')  -- NEW
+
+open AExp'
+
+inductive AEvalR' : AExp' → Nat → Prop where
+  | E_ANum (n : Nat) : AEvalR' (ANum n) n
+  | E_APlus (a1 a2 : AExp') (n1 n2 : Nat) :
+      AEvalR' a1 n1 → AEvalR' a2 n2 → AEvalR' (APlus a1 a2) (n1 + n2)
+  | E_AMinus (a1 a2 : AExp') (n1 n2 : Nat) :
+      AEvalR' a1 n1 → AEvalR' a2 n2 → AEvalR' (AMinus a1 a2) (n1 - n2)
+  | E_AMult (a1 a2 : AExp') (n1 n2 : Nat) :
+      AEvalR' a1 n1 → AEvalR' a2 n2 → AEvalR' (AMult a1 a2) (n1 * n2)
+  | E_ADiv (a1 a2 : AExp') (n1 n2 n3 : Nat) :  -- NEW
+      AEvalR' a1 n1 → AEvalR' a2 n2 → n2 > 0 → n2 * n3 = n1 → AEvalR' (ADiv a1 a2) n3
+
+-- This relation is partial: ADiv (ANum 5) (ANum 0) has no evaluation
+
+end AEvalR_Division
+
+-- Example: Nondeterminism - impossible with functions, easy with relations
+
+namespace AEvalR_Extended
+
+inductive AExp'' : Type where
+  | AAny            -- NEW: evaluates to any number
+  | ANum (n : Nat)
+  | APlus (a1 a2 : AExp'')
+  | AMinus (a1 a2 : AExp'')
+  | AMult (a1 a2 : AExp'')
+
+open AExp''
+
+inductive AEvalR'' : AExp'' → Nat → Prop where
+  | E_Any (n : Nat) : AEvalR'' AAny n  -- NEW: any n is valid
+  | E_ANum (n : Nat) : AEvalR'' (ANum n) n
+  | E_APlus (a1 a2 : AExp'') (n1 n2 : Nat) :
+      AEvalR'' a1 n1 → AEvalR'' a2 n2 → AEvalR'' (APlus a1 a2) (n1 + n2)
+  | E_AMinus (a1 a2 : AExp'') (n1 n2 : Nat) :
+      AEvalR'' a1 n1 → AEvalR'' a2 n2 → AEvalR'' (AMinus a1 a2) (n1 - n2)
+  | E_AMult (a1 a2 : AExp'') (n1 n2 : Nat) :
+      AEvalR'' a1 n1 → AEvalR'' a2 n2 → AEvalR'' (AMult a1 a2) (n1 * n2)
+
+-- AAny can evaluate to any natural number - nondeterministic
+
+end AEvalR_Extended
