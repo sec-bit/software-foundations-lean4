@@ -475,3 +475,94 @@ def subtract_3_from_5_slowly : Com :=
 -- Infinite loop: while true do skip end
 def loop : Com :=
   CWhile BTrue CSkip
+
+
+-- ------------------ EVALUATING COMMANDS -----------------------
+
+-- Evaluation as a function (failed attempt)
+-- While is bogus - just returns current state (can't define terminating function)
+def ceval_fun_no_while (st : State) (c : Com) : State :=
+  match c with
+  | CSkip => st
+  | CAsgn x a => tUpdate st x (aeval' st a)
+  | CSeq c1 c2 =>
+      let st' := ceval_fun_no_while st c1
+      ceval_fun_no_while st' c2
+  | CIf b c1 c2 =>
+      if beval' st b
+      then ceval_fun_no_while st c1
+      else ceval_fun_no_while st c2
+  | CWhile _ _ => st  -- bogus!
+
+-- ------------------ EVALUATION AS A RELATION -----------------------
+
+inductive CEval : Com → State → State → Prop where
+  | E_Skip (st : State) :
+      CEval CSkip st st
+  | E_Asgn (st : State) (a : AExp') (n : Nat) (x : String) :
+      aeval' st a = n →
+      CEval (CAsgn x a) st (tUpdate st x n)
+  | E_Seq (c1 c2 : Com) (st st' st'' : State) :
+      CEval c1 st st' →
+      CEval c2 st' st'' →
+      CEval (CSeq c1 c2) st st''
+  | E_IfTrue (st st' : State) (b : BExp') (c1 c2 : Com) :
+      beval' st b = true →
+      CEval c1 st st' →
+      CEval (CIf b c1 c2) st st'
+  | E_IfFalse (st st' : State) (b : BExp') (c1 c2 : Com) :
+      beval' st b = false →
+      CEval c2 st st' →
+      CEval (CIf b c1 c2) st st'
+  | E_WhileFalse (b : BExp') (st : State) (c : Com) :
+      beval' st b = false →
+      CEval (CWhile b c) st st
+  | E_WhileTrue (st st' st'' : State) (b : BExp') (c : Com) :
+      beval' st b = true →
+      CEval c st st' →
+      CEval (CWhile b c) st' st'' →
+      CEval (CWhile b c) st st''
+
+-- Notation: st =[ c ]=> st'
+notation:40 st " =[ " c " ]=> " st' => CEval c st st'
+
+-- ------------------ EXAMPLES -----------------------
+
+-- Example 1:
+--   empty_st =[ X := 2; if (X <= 1) then Y := 3 else Z := 4 end ]=> (Z !-> 4 ; X !-> 2)
+example : empty_st =[
+    CSeq (CAsgn X (ANum 2))
+         (CIf (BLe (AId X) (ANum 1)) (CAsgn Y (ANum 3)) (CAsgn Z (ANum 4)))
+  ]=> tUpdate (tUpdate empty_st X 2) Z 4 := by
+  apply CEval.E_Seq (st' := tUpdate empty_st X 2)
+  · -- X := 2
+    apply CEval.E_Asgn; rfl
+  · -- if (X <= 1) then Y := 3 else Z := 4 end
+    apply CEval.E_IfFalse
+    · -- beval' (X !-> 2) (X <= 1) = false (since 2 <= 1 is false)
+      native_decide
+    · -- Z := 4
+      apply CEval.E_Asgn; rfl
+
+-- Example 2:
+--   empty_st =[ X := 0; Y := 1; Z := 2 ]=> (Z !-> 2 ; Y !-> 1 ; X !-> 0)
+example : empty_st =[
+    CSeq (CAsgn X (ANum 0))
+         (CSeq (CAsgn Y (ANum 1))
+               (CAsgn Z (ANum 2)))
+  ]=> tUpdate (tUpdate (tUpdate empty_st X 0) Y 1) Z 2 := by
+  apply CEval.E_Seq (st' := tUpdate empty_st X 0)
+  · apply CEval.E_Asgn; rfl
+  · apply CEval.E_Seq (st' := tUpdate (tUpdate empty_st X 0) Y 1)
+    · apply CEval.E_Asgn; rfl
+    · apply CEval.E_Asgn; rfl
+
+-- ------------------ MORE EXAMPLES -----------------------
+
+-- Sum from 1 to X, store in Y
+-- Y := 0; while X > 0 do Y := Y + X; X := X - 1 end
+def pup_to_n : Com :=
+  CSeq (CAsgn Y (ANum 0))
+       (CWhile (BGt (AId X) (ANum 0))
+               (CSeq (CAsgn Y (APlus (AId Y) (AId X)))
+                     (CAsgn X (AMinus (AId X) (ANum 1)))))
