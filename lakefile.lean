@@ -39,3 +39,7 @@ lean_lib «Maps» where
 @[default_target]
 lean_lib «ProofObjects» where
   srcDir := "."
+
+@[default_target]
+lean_lib «Imp» where
+  srcDir := "."
