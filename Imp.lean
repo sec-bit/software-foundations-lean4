@@ -735,3 +735,150 @@ theorem no_whiles_terminating : ∀ c, NoWhilesR c → ∀ (st : State), ∃ st'
     cases Hb : beval' st b with
     | true => exact ⟨st1, CEval.E_IfTrue st st1 b c1 c2 Hb H1⟩
     | false => exact ⟨st2, CEval.E_IfFalse st st2 b c1 c2 Hb H2⟩
+
+
+
+-- ------------------------ ADDITIONAL EXERCISES --------------------------------
+
+-- ------------------- STACK COMPILER -------------------
+
+inductive SInstr : Type where
+  | SPush (n : Nat)
+  | SLoad (x : String)
+  | SPlus
+  | SMinus
+  | SMult
+  deriving Repr
+
+open SInstr
+
+def s_execute (st : State) (stack : List Nat) (prog : List SInstr) : List Nat :=
+  match prog with
+  | [] => stack
+  | SPush n :: prog' => s_execute st (n :: stack) prog'
+  | SLoad x :: prog' => s_execute st (st x :: stack) prog'
+  | SPlus :: prog' =>
+      match stack with
+      | n2 :: n1 :: stack' => s_execute st ((n1 + n2) :: stack') prog'
+      | _ => s_execute st stack prog'
+  | SMinus :: prog' =>
+      match stack with
+      | n2 :: n1 :: stack' => s_execute st ((n1 - n2) :: stack') prog'
+      | _ => s_execute st stack prog'
+  | SMult :: prog' =>
+      match stack with
+      | n2 :: n1 :: stack' => s_execute st ((n1 * n2) :: stack') prog'
+      | _ => s_execute st stack prog'
+
+example : s_execute empty_st [] [SPush 5, SPush 3, SPush 1, SMinus] = [2, 5] := rfl
+
+example : s_execute (tUpdate empty_st X 3) [3, 4] [SPush 4, SLoad X, SMult, SPlus] = [15, 4] := rfl
+
+def s_compile (e : AExp') : List SInstr :=
+  match e with
+  | .ANum n => [SPush n]
+  | .AId x => [SLoad x]
+  | .APlus a1 a2 => s_compile a1 ++ s_compile a2 ++ [SPlus]
+  | .AMinus a1 a2 => s_compile a1 ++ s_compile a2 ++ [SMinus]
+  | .AMult a1 a2 => s_compile a1 ++ s_compile a2 ++ [SMult]
+
+-- s_compile <{ X - (2*Y) }> = [SLoad X, SPush 2, SLoad Y, SMult, SMinus]
+example : s_compile (AExp'.AMinus (AExp'.AId X) (AExp'.AMult (AExp'.ANum 2) (AExp'.AId Y)))
+        = [SLoad X, SPush 2, SLoad Y, SMult, SMinus] := rfl
+
+-- ------------------- STACK COMPILER CORRECTNESS -------------------
+
+theorem execute_app : ∀ (st : State) p1 p2 stack,
+    s_execute st stack (p1 ++ p2) = s_execute st (s_execute st stack p1) p2 := by
+  intro st p1 p2
+  induction p1 with
+  | nil => simp [s_execute]
+  | cons s p1' ih =>
+    intro stack
+    cases s with
+    | SPush n => simp [s_execute]; exact ih (n :: stack)
+    | SLoad x => simp [s_execute]; exact ih (st x :: stack)
+    | SPlus =>
+      simp [s_execute]
+      cases stack with
+      | nil => exact ih []
+      | cons n2 stack' =>
+        cases stack' with
+        | nil => exact ih [n2]
+        | cons n1 stack'' => exact ih ((n1 + n2) :: stack'')
+    | SMinus =>
+      simp [s_execute]
+      cases stack with
+      | nil => exact ih []
+      | cons n2 stack' =>
+        cases stack' with
+        | nil => exact ih [n2]
+        | cons n1 stack'' => exact ih ((n1 - n2) :: stack'')
+    | SMult =>
+      simp [s_execute]
+      cases stack with
+      | nil => exact ih []
+      | cons n2 stack' =>
+        cases stack' with
+        | nil => exact ih [n2]
+        | cons n1 stack'' => exact ih ((n1 * n2) :: stack'')
+
+theorem s_compile_correct_aux : ∀ (st : State) e stack,
+    s_execute st stack (s_compile e) = aeval' st e :: stack := by
+  intro st e
+  induction e with
+  | ANum n => intro stack; rfl
+  | AId x => intro stack; rfl
+  | APlus a1 a2 ih1 ih2 =>
+    intro stack
+    simp [s_compile, aeval']
+    rw [execute_app, execute_app, ih1, ih2]
+    rfl
+  | AMinus a1 a2 ih1 ih2 =>
+    intro stack
+    simp [s_compile, aeval']
+    rw [execute_app, execute_app, ih1, ih2]
+    rfl
+  | AMult a1 a2 ih1 ih2 =>
+    intro stack
+    simp [s_compile, aeval']
+    rw [execute_app, execute_app, ih1, ih2]
+    rfl
+
+theorem s_compile_correct : ∀ (st : State) (e : AExp'),
+    s_execute st [] (s_compile e) = [aeval' st e] := by
+  intro st e
+  exact s_compile_correct_aux st e []
+
+-- ------------------- SHORT CIRCUIT EVALUATION -------------------
+
+def beval_short_circuit (st : State) (b : BExp') : Bool :=
+  match b with
+  | .BTrue => true
+  | .BFalse => false
+  | .BEq a1 a2 => aeval' st a1 == aeval' st a2
+  | .BNeq a1 a2 => !(aeval' st a1 == aeval' st a2)
+  | .BLe a1 a2 => decide (aeval' st a1 ≤ aeval' st a2)
+  | .BGt a1 a2 => !(decide (aeval' st a1 ≤ aeval' st a2))
+  | .BNot b1 => !beval_short_circuit st b1
+  | .BAnd b1 b2 =>
+      match beval_short_circuit st b1 with
+      | false => false
+      | true => beval_short_circuit st b2
+
+theorem beval_short_circuit_eq : ∀ (st : State) (b : BExp'),
+    beval_short_circuit st b = beval' st b := by
+  intro st b
+  induction b with
+  | BTrue => rfl
+  | BFalse => rfl
+  | BEq _ _ => rfl
+  | BNeq _ _ => rfl
+  | BLe _ _ => rfl
+  | BGt _ _ => rfl
+  | BNot b ih => simp [beval_short_circuit, beval', ih]
+  | BAnd b1 b2 ih1 ih2 =>
+    simp [beval_short_circuit, beval']
+    cases h : beval_short_circuit st b1 with
+    | false => simp_all
+    | true => simp_all
