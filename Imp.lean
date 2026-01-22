@@ -882,3 +882,193 @@ theorem beval_short_circuit_eq : ∀ (st : State) (b : BExp'),
     cases h : beval_short_circuit st b1 with
     | false => simp_all
     | true => simp_all
+
+-- ------------------- BREAK IMP -------------------
+
+namespace BreakImp
+
+inductive Com : Type where
+  | CSkip
+  | CBreak
+  | CAsgn (x : String) (a : AExp')
+  | CSeq (c1 c2 : Com)
+  | CIf (b : BExp') (c1 c2 : Com)
+  | CWhile (b : BExp') (c : Com)
+
+open Com
+
+inductive Result : Type where
+  | SContinue
+  | SBreak
+  deriving Repr, DecidableEq
+
+open Result
+
+inductive CEval : Com → State → Result → State → Prop where
+  | E_Skip (st : State) :
+      CEval CSkip st SContinue st
+  | E_Break (st : State) :
+      CEval CBreak st SBreak st
+  | E_Asgn (st : State) (a : AExp') (n : Nat) (x : String) :
+      aeval' st a = n →
+      CEval (CAsgn x a) st SContinue (tUpdate st x n)
+  | E_Seq1 (c1 c2 : Com) (st st' : State) :
+      CEval c1 st SBreak st' →
+      CEval (CSeq c1 c2) st SBreak st'
+  | E_Seq2 (c1 c2 : Com) (st st' st'' : State) (s : Result) :
+      CEval c1 st SContinue st' →
+      CEval c2 st' s st'' →
+      CEval (CSeq c1 c2) st s st''
+  | E_IfTrue (st st' : State) (b : BExp') (c1 c2 : Com) (s : Result) :
+      beval' st b = true →
+      CEval c1 st s st' →
+      CEval (CIf b c1 c2) st s st'
+  | E_IfFalse (st st' : State) (b : BExp') (c1 c2 : Com) (s : Result) :
+      beval' st b = false →
+      CEval c2 st s st' →
+      CEval (CIf b c1 c2) st s st'
+  | E_WhileFalse (b : BExp') (st : State) (c : Com) :
+      beval' st b = false →
+      CEval (CWhile b c) st SContinue st
+  | E_WhileTrue1 (st st' : State) (b : BExp') (c : Com) :
+      beval' st b = true →
+      CEval c st SBreak st' →
+      CEval (CWhile b c) st SContinue st'
+  | E_WhileTrue2 (st st' st'' : State) (b : BExp') (c : Com) :
+      beval' st b = true →
+      CEval c st SContinue st' →
+      CEval (CWhile b c) st' SContinue st'' →
+      CEval (CWhile b c) st SContinue st''
+
+theorem break_ignore : ∀ c (st st' : State) s,
+    CEval (CSeq CBreak c) st s st' →
+    st = st' := by
+  intro c st st' s H
+  cases H with
+  | E_Seq1 _ _ _ _ Hbreak =>
+    cases Hbreak
+    rfl
+  | E_Seq2 _ _ _ _ _ _ Hcont _ =>
+    cases Hcont
+
+theorem while_continue : ∀ b c (st st' : State) s,
+    CEval (CWhile b c) st s st' →
+    s = SContinue := by
+  intro b c st st' s H
+  cases H <;> rfl
+
+theorem while_stops_on_break : ∀ b c (st st' : State),
+    beval' st b = true →
+    CEval c st SBreak st' →
+    CEval (CWhile b c) st SContinue st' := by
+  intro b c st st' Hb Hc
+  exact CEval.E_WhileTrue1 st st' b c Hb Hc
+
+theorem seq_continue : ∀ c1 c2 (st st' st'' : State),
+    CEval c1 st SContinue st' →
+    CEval c2 st' SContinue st'' →
+    CEval (CSeq c1 c2) st SContinue st'' := by
+  intro c1 c2 st st' st'' H1 H2
+  exact CEval.E_Seq2 c1 c2 st st' st'' SContinue H1 H2
+
+theorem seq_stops_on_break : ∀ c1 c2 (st st' : State),
+    CEval c1 st SBreak st' →
+    CEval (CSeq c1 c2) st SBreak st' := by
+  intro c1 c2 st st' H
+  exact CEval.E_Seq1 c1 c2 st st' H
+
+theorem while_break_true : ∀ b c (st st' : State),
+    CEval (CWhile b c) st SContinue st' →
+    beval' st' b = true →
+    ∃ st'', CEval c st'' SBreak st' := by
+  intro b c st st' H Hb'
+  generalize Hs : SContinue = s at H
+  generalize Hloop : CWhile b c = loopdef at H
+  induction H with
+  | E_Skip _ => injection Hloop
+  | E_Break _ => injection Hloop
+  | E_Asgn _ _ _ _ _ => injection Hloop
+  | E_Seq1 _ _ _ _ _ => injection Hloop
+  | E_Seq2 _ _ _ _ _ _ _ _ => injection Hloop
+  | E_IfTrue _ _ _ _ _ _ _ _ => injection Hloop
+  | E_IfFalse _ _ _ _ _ _ _ _ => injection Hloop
+  | E_WhileFalse b' st'' c' Hb =>
+    injection Hloop with Hbeq Hceq
+    subst Hbeq Hceq
+    simp [Hb] at Hb'
+  | E_WhileTrue1 st1 st1' b' c' Hb Hc =>
+    injection Hloop with Hbeq Hceq
+    subst Hbeq Hceq
+    exact ⟨st1, Hc⟩
+  | E_WhileTrue2 st1 st1' st1'' b' c' Hb _ _ _ ih2 =>
+    injection Hloop with Hbeq Hceq
+    subst Hbeq Hceq
+    exact ih2 Hb' rfl rfl 
+
+theorem ceval_deterministic : ∀ (c : Com) (st st1 st2 : State) (s1 s2 : Result),
+    CEval c st s1 st1 →
+    CEval c st s2 st2 →
+    st1 = st2 ∧ s1 = s2 := by
+  intro c st st1 st2 s1 s2 E1 E2
+  induction E1 generalizing st2 s2 with
+  | E_Skip st =>
+    cases E2
+    exact ⟨rfl, rfl⟩
+  | E_Break st =>
+    cases E2
+    exact ⟨rfl, rfl⟩
+  | E_Asgn st a n x Ha =>
+    cases E2 with
+    | E_Asgn _ _ n' _ Ha' =>
+      simp [Ha] at Ha'
+      subst Ha'
+      exact ⟨rfl, rfl⟩
+  | E_Seq1 c1 c2 st st' H1 ih1 =>
+    cases E2 with
+    | E_Seq1 _ _ _ _ H1' =>
+      have ⟨Heq, _⟩ := ih1 st2 SBreak H1'
+      exact ⟨Heq, rfl⟩
+    | E_Seq2 _ _ _ st'0 _ _ H1' _ =>
+      have ⟨_, Hcontra⟩ := ih1 st'0 SContinue H1'
+      contradiction
+  | E_Seq2 c1 c2 st st' st'' s H1 H2 ih1 ih2 =>
+    cases E2 with
+    | E_Seq1 _ _ _ _ H1' =>
+      have ⟨_, Hcontra⟩ := ih1 st2 SBreak H1'
+      contradiction
+    | E_Seq2 _ _ _ st'0 _ _ H1' H2' =>
+      have ⟨Heq, _⟩ := ih1 st'0 SContinue H1'
+      subst Heq
+      exact ih2 st2 s2 H2'
+  | E_IfTrue st st' b c1 c2 s Hb H ih =>
+    cases E2 with
+    | E_IfTrue _ _ _ _ _ _ _ H' => exact ih st2 s2 H'
+    | E_IfFalse _ _ _ _ _ _ Hb' _ => simp [Hb] at Hb'
+  | E_IfFalse st st' b c1 c2 s Hb H ih =>
+    cases E2 with
+    | E_IfTrue _ _ _ _ _ _ Hb' _ => simp [Hb] at Hb'
+    | E_IfFalse _ _ _ _ _ _ _ H' => exact ih st2 s2 H'
+  | E_WhileFalse b st c Hb =>
+    cases E2 with
+    | E_WhileFalse _ _ _ _ => exact ⟨rfl, rfl⟩
+    | E_WhileTrue1 _ _ _ _ Hb' _ => simp [Hb] at Hb'
+    | E_WhileTrue2 _ _ _ _ _ Hb' _ _ => simp [Hb] at Hb'
+  | E_WhileTrue1 st st' b c Hb Hc ih =>
+    cases E2 with
+    | E_WhileFalse _ _ _ Hb' => simp [Hb] at Hb'
+    | E_WhileTrue1 _ _ _ _ _ Hc' =>
+      have ⟨Heq, _⟩ := ih st2 SBreak Hc'
+      exact ⟨Heq, rfl⟩
+    | E_WhileTrue2 _ st'0 _ _ _ _ Hc' _ =>
+      have ⟨_, Hcontra⟩ := ih st'0 SContinue Hc'
+      contradiction
+  | E_WhileTrue2 st st' st'' b c Hb Hc Hw ih1 ih2 =>
+    cases E2 with
+    | E_WhileFalse _ _ _ Hb' => simp [Hb] at Hb'
+    | E_WhileTrue1 _ _ _ _ _ Hc' =>
+      have ⟨_, Hcontra⟩ := ih1 st2 SBreak Hc'
+      contradiction
+    | E_WhileTrue2 _ st'0 _ _ _ _ Hc' Hw' =>
+      have ⟨Heq, _⟩ := ih1 st'0 SContinue Hc'
+      subst Heq
+      exact ih2 st2 SContinue Hw'
