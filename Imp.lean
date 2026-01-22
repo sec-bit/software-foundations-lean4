@@ -566,3 +566,172 @@ def pup_to_n : Com :=
        (CWhile (BGt (AId X) (ANum 0))
                (CSeq (CAsgn Y (APlus (AId Y) (AId X)))
                      (CAsgn X (AMinus (AId X) (ANum 1)))))
+
+theorem pup_to_2_ceval :
+    (tUpdate empty_st X 2) =[
+      pup_to_n
+    ]=> (tUpdate (tUpdate (tUpdate (tUpdate (tUpdate (tUpdate empty_st X 2) Y 0) Y 2) X 1) Y 3) X 0) := by
+  unfold pup_to_n
+  apply CEval.E_Seq (st' := tUpdate (tUpdate empty_st X 2) Y 0)
+  · apply CEval.E_Asgn; rfl
+  · apply CEval.E_WhileTrue (st' := tUpdate (tUpdate (tUpdate (tUpdate empty_st X 2) Y 0) Y 2) X 1)
+    · native_decide
+    · apply CEval.E_Seq (st' := tUpdate (tUpdate (tUpdate empty_st X 2) Y 0) Y 2)
+      · apply CEval.E_Asgn; rfl
+      · apply CEval.E_Asgn; rfl
+    · apply CEval.E_WhileTrue (st' := tUpdate (tUpdate (tUpdate (tUpdate (tUpdate (tUpdate empty_st X 2) Y 0) Y 2) X 1) Y 3) X 0)
+      · native_decide
+      · apply CEval.E_Seq (st' := tUpdate (tUpdate (tUpdate (tUpdate (tUpdate empty_st X 2) Y 0) Y 2) X 1) Y 3)
+        · apply CEval.E_Asgn; rfl
+        · apply CEval.E_Asgn; rfl
+      · apply CEval.E_WhileFalse
+        native_decide
+
+-- ------------------- DETERMINISM OF EVALUATION -------------------
+
+theorem ceval_deterministic : ∀ c (st st1 st2 : State),
+    CEval c st st1 →
+    CEval c st st2 →
+    st1 = st2 := by
+  intro c st st1 st2 E1 E2
+  induction E1 generalizing st2 with
+  | E_Skip st =>
+    cases E2
+    rfl
+  | E_Asgn st a n x Ha =>
+    cases E2 with
+    | E_Asgn _ _ n' _ Ha' =>
+      simp [Ha] at Ha'
+      subst Ha'
+      rfl
+  | E_Seq c1 c2 st st' st'' _ _ ih1 ih2 =>
+    cases E2 with
+    | E_Seq _ _ _ st'0 _ H1 H2 =>
+      have : st' = st'0 := ih1 st'0 H1
+      subst this
+      exact ih2 st2 H2
+  | E_IfTrue st st' b c1 c2 Hb _ ih =>
+    cases E2 with
+    | E_IfTrue _ _ _ _ _ _ H => exact ih st2 H
+    | E_IfFalse _ _ _ _ _ Hb' _ => simp [Hb] at Hb'
+  | E_IfFalse st st' b c1 c2 Hb _ ih =>
+    cases E2 with
+    | E_IfTrue _ _ _ _ _ Hb' _ => simp [Hb] at Hb'
+    | E_IfFalse _ _ _ _ _ _ H => exact ih st2 H
+  | E_WhileFalse b st c Hb =>
+    cases E2 with
+    | E_WhileFalse _ _ _ _ => rfl
+    | E_WhileTrue _ _ _ _ _ Hb' _ _ => simp [Hb] at Hb'
+  | E_WhileTrue st st' st'' b c Hb _ _ ih1 ih2 =>
+    cases E2 with
+    | E_WhileFalse _ _ _ Hb' => simp [Hb] at Hb'
+    | E_WhileTrue _ st'0 _ _ _ _ H1 H2 =>
+      have : st' = st'0 := ih1 st'0 H1
+      subst this
+      exact ih2 st2 H2
+
+-- ------------------- REASONING ABOUT IMP PROGRAMS -------------------
+
+theorem plus2_spec : ∀ (st : State) n (st' : State),
+    st X = n →
+    CEval plus2 st st' →
+    st' X = n + 2 := by
+  intro st n st' HX Heval
+  cases Heval with
+  | E_Asgn _ _ _ _ Ha =>
+    simp [tUpdate_eq]
+    simp [aeval', HX] at Ha
+    omega
+
+theorem XtimesYinZ_spec : ∀ (st : State) m n (st' : State),
+    st X = m →
+    st Y = n →
+    CEval XtimesYinZ st st' →
+    st' Z = m * n := by
+  intro st m n st' HX HY Heval
+  cases Heval with
+  | E_Asgn _ _ _ _ Ha =>
+    simp [tUpdate_eq]
+    simp [aeval', HX, HY] at Ha
+    omega
+
+-- ------------------- LOOP NEVER STOPS -------------------
+
+theorem loop_never_stops : ∀ (st st' : State),
+    ¬(CEval loop st st') := by
+  intro st st' contra
+  unfold loop at contra
+  generalize Hloop : Com.CWhile BExp'.BTrue Com.CSkip = loopdef at contra
+  induction contra with
+  | E_Skip => injection Hloop
+  | E_Asgn => injection Hloop
+  | E_Seq => injection Hloop
+  | E_IfTrue => injection Hloop
+  | E_IfFalse => injection Hloop
+  | E_WhileFalse b st c Hb =>
+    injection Hloop with Hb' Hc'
+    subst Hb' Hc'
+    simp [beval'] at Hb
+  | E_WhileTrue st st' st'' b c Hb _ _ _ ih2 =>
+    injection Hloop with Hb' Hc'
+    subst Hb' Hc'
+    exact ih2 rfl
+
+-- ------------------- NO WHILES -------------------
+
+def no_whiles (c : Com) : Bool :=
+  match c with
+  | .CSkip => true
+  | .CAsgn _ _ => true
+  | .CSeq c1 c2 => no_whiles c1 && no_whiles c2
+  | .CIf _ c1 c2 => no_whiles c1 && no_whiles c2
+  | .CWhile _ _ => false
+
+inductive NoWhilesR : Com → Prop where
+  | Skip : NoWhilesR .CSkip
+  | Asgn (x : String) (a : AExp') : NoWhilesR (.CAsgn x a)
+  | Seq (c1 c2 : Com) : NoWhilesR c1 → NoWhilesR c2 → NoWhilesR (.CSeq c1 c2)
+  | If (b : BExp') (c1 c2 : Com) : NoWhilesR c1 → NoWhilesR c2 → NoWhilesR (.CIf b c1 c2)
+
+theorem no_whiles_eqv : ∀ c, no_whiles c = true ↔ NoWhilesR c := by
+  intro c
+  constructor
+  · intro H
+    induction c with
+    | CSkip => exact NoWhilesR.Skip
+    | CAsgn x a => exact NoWhilesR.Asgn x a
+    | CSeq c1 c2 ih1 ih2 =>
+      simp [no_whiles] at H
+      exact NoWhilesR.Seq c1 c2 (ih1 H.1) (ih2 H.2)
+    | CIf b c1 c2 ih1 ih2 =>
+      simp [no_whiles] at H
+      exact NoWhilesR.If b c1 c2 (ih1 H.1) (ih2 H.2)
+    | CWhile _ _ => simp [no_whiles] at H
+  · intro H
+    induction H with
+    | Skip => rfl
+    | Asgn _ _ => rfl
+    | Seq _ _ _ _ ih1 ih2 => simp [no_whiles, ih1, ih2]
+    | If _ _ _ _ _ ih1 ih2 => simp [no_whiles, ih1, ih2]
+
+theorem no_whiles_terminating : ∀ c, NoWhilesR c → ∀ (st : State), ∃ st', CEval c st st' := by
+  intro c H
+  induction H with
+  | Skip =>
+    intro st
+    exact ⟨st, CEval.E_Skip st⟩
+  | Asgn x a =>
+    intro st
+    exact ⟨tUpdate st x (aeval' st a), CEval.E_Asgn st a (aeval' st a) x rfl⟩
+  | Seq c1 c2 _ _ ih1 ih2 =>
+    intro st
+    have ⟨st1, H1⟩ := ih1 st
+    have ⟨st2, H2⟩ := ih2 st1
+    exact ⟨st2, CEval.E_Seq c1 c2 st st1 st2 H1 H2⟩
+  | If b c1 c2 _ _ ih1 ih2 =>
+    intro st
+    have ⟨st1, H1⟩ := ih1 st
+    have ⟨st2, H2⟩ := ih2 st
+    cases Hb : beval' st b with
+    | true => exact ⟨st1, CEval.E_IfTrue st st1 b c1 c2 Hb H1⟩
+    | false => exact ⟨st2, CEval.E_IfFalse st st2 b c1 c2 Hb H2⟩
