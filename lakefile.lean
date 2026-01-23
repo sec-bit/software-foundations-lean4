@@ -51,3 +51,7 @@ lean_lib «ImpParser» where
 @[default_target]
 lean_lib «ImpCEvalFun» where
   srcDir := "."
+
+@[default_target]
+lean_lib «Rel» where
+  srcDir := "."
