@@ -183,3 +183,68 @@ notation:50 m " <=2 " n => Le2 m n
 
 #check @Le1.rec
 #check @Le2.rec
+
+-- -------------------- EXPLICIT PROOF OBJECTS FOR INDUCTION --------------------
+
+#check @Nat.rec
+
+def build_proof
+    (P : Nat → Prop)
+    (evP0 : P 0)
+    (evPS : ∀ n : Nat, P n → P (n + 1))
+    (n : Nat) : P n :=
+  match n with
+  | 0 => evP0
+  | k + 1 => evPS k (build_proof P evP0 evPS k)
+
+def nat_ind_tidy := build_proof
+
+-- -------------------- CUSTOM INDUCTION PRINCIPLES --------------------
+
+def even (n : Nat) : Bool :=
+  match n with
+  | 0 => true
+  | 1 => false
+  | n + 2 => even n
+
+def nat_ind2
+    (P : Nat → Prop)
+    (P0 : P 0)
+    (P1 : P 1)
+    (PSS : ∀ n : Nat, P n → P (n + 2))
+    (n : Nat) : P n :=
+  match n with
+  | 0 => P0
+  | 1 => P1
+  | n' + 2 => PSS n' (nat_ind2 P P0 P1 PSS n')
+
+theorem even_ev : ∀ n, even n = true → ev n := by
+  intro n
+  induction n using nat_ind2 with
+  | P0 => intro _; exact ev.ev_0
+  | P1 => intro h; contradiction
+  | PSS n' ih =>
+    intro h
+    exact ev.ev_SS n' (ih h)
+
+-- -------------------- NESTED INDUCTIVE TYPES --------------------
+
+inductive TTree (α : Type) : Type where
+  | t_leaf : TTree α
+  | t_branch : TTree α → α → TTree α → TTree α
+
+open TTree
+
+def reflect {α : Type} (t : TTree α) : TTree α :=
+  match t with
+  | t_leaf => t_leaf
+  | t_branch l v r => t_branch (reflect r) v (reflect l)
+
+
+-- Standard induction works fine in Lean for this definition
+-- no need for custom `better_t_tree_ind`
+theorem reflect_involution : ∀ (α : Type) (t : TTree α), reflect (reflect t) = t := by
+  intro α t
+  induction t with
+  | t_leaf => rfl
+  | t_branch l v r ihl ihr => simp [reflect, ihl, ihr]
